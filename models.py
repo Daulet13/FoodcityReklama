@@ -41,6 +41,14 @@ class BusinessCategoryEnum(enum.Enum):
     SERVICES = 'Услуги'
     OTHER = 'Другое'
 
+class ContractStatus(enum.Enum):
+    ACTIVE = 'Активный'
+    ARCHIVE = 'Архив'
+
+class BillingType(enum.Enum):
+    MONTHLY = 'Ежемесячное'
+    ONE_TIME = 'Разовое'
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -97,3 +105,54 @@ class BusinessCategory(db.Model):
 
     def __repr__(self):
         return f'<BusinessCategory {self.name.value}>'
+
+class Contract(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.String(50), unique=True, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    app_end_date = db.Column(db.Date)
+    pavilion_number = db.Column(db.String(50))
+    status = db.Column(db.Enum(ContractStatus), default=ContractStatus.ACTIVE, nullable=False)
+
+    counterparty_id = db.Column(db.Integer, db.ForeignKey('counterparty.id'), nullable=False)
+    manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('business_category.id'), nullable=False)
+
+    counterparty = db.relationship('Counterparty', backref=db.backref('contracts', lazy=True))
+    manager = db.relationship('User', backref=db.backref('contracts', lazy=True))
+    category = db.relationship('BusinessCategory', backref=db.backref('contracts', lazy=True))
+
+    def __repr__(self):
+        return f'<Contract {self.number}>'
+
+class Specification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.String(100), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    description = db.Column(db.Text)
+
+    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'), nullable=False)
+    contract = db.relationship('Contract', backref=db.backref('specifications', lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f'<Specification {self.number} for Contract {self.contract.number}>'
+
+class SpecificationService(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.Text)
+    billing_type = db.Column(db.Enum(BillingType), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+
+    specification_id = db.Column(db.Integer, db.ForeignKey('specification.id'), nullable=False)
+    property_object_id = db.Column(db.Integer, db.ForeignKey('property_object.id'))
+    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'), nullable=False)
+
+    specification = db.relationship('Specification', backref=db.backref('services', lazy=True, cascade="all, delete-orphan"))
+    property_object = db.relationship('PropertyObject')
+    service_type = db.relationship('ServiceType')
+    
+    def __repr__(self):
+        return f'<SpecificationService {self.id}>'

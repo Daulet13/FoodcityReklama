@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Объекты недвижимости{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Объекты недвижимости</h1>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Добавить новый объект
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="name" class="form-label">Название объекта</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="type_id" class="form-label">Тип объекта</label>
+                        <select class="form-select" id="type_id" name="type_id" required>
+                            <option selected disabled value="">Выберите...</option>
+                            {% for type in object_types %}
+                            <option value="{{ type.id }}">{{ type.name.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="location" class="form-label">Расположение</label>
+                        <input type="text" class="form-control" id="location" name="location">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="characteristics" class="form-label">Характеристики/размеры</label>
+                        <input type="text" class="form-control" id="characteristics" name="characteristics">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Список объектов
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Тип</th>
+                        <th>Расположение</th>
+                        <th>Характеристики</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td>{{ obj.name }}</td>
+                        <td>{{ obj.type.name.value }}</td>
+                        <td>{{ obj.location }}</td>
+                        <td>{{ obj.characteristics }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">Объектов пока нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

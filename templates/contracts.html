@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Договоры{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Договоры</h1>
+
+<div class="card mb-4">
+    <div class="card-header">
+        Добавить новый договор
+    </div>
+    <div class="card-body">
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="number" class="form-label">Номер договора</label>
+                    <input type="text" class="form-control" id="number" name="number" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="date" class="form-label">Дата договора</label>
+                    <input type="date" class="form-control" id="date" name="date" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="app_end_date" class="form-label">Дата окончания АПП</label>
+                    <input type="date" class="form-control" id="app_end_date" name="app_end_date">
+                </div>
+
+                <div class="col-md-6">
+                    <label for="counterparty_id" class="form-label">Контрагент</label>
+                    <select class="form-select" id="counterparty_id" name="counterparty_id" required>
+                        <option selected disabled value="">Выберите...</option>
+                        {% for cp in counterparties %}
+                        <option value="{{ cp.id }}">{{ cp.brand_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="manager_id" class="form-label">Ответственный менеджер</label>
+                    <select class="form-select" id="manager_id" name="manager_id" required>
+                         <option selected disabled value="">Выберите...</option>
+                        {% for manager in managers %}
+                        <option value="{{ manager.id }}">{{ manager.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="category_id" class="form-label">Категория бизнеса</label>
+                     <select class="form-select" id="category_id" name="category_id" required>
+                         <option selected disabled value="">Выберите...</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="pavilion_number" class="form-label">Номер павильона</label>
+                    <input type="text" class="form-control" id="pavilion_number" name="pavilion_number">
+                </div>
+                <div class="col-md-4">
+                    <label for="status" class="form-label">Статус</label>
+                     <select class="form-select" id="status" name="status" required>
+                        {% for status in statuses %}
+                        <option value="{{ status.name }}">{{ status.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Добавить договор</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Список договоров
+    </div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Контрагент</th>
+                    <th>Менеджер</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contract in contracts %}
+                <tr>
+                    <td><a href="{{ url_for('contract_detail', contract_id=contract.id) }}">{{ contract.number }}</a></td>
+                    <td>{{ contract.date.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ contract.counterparty.brand_name }}</td>
+                    <td>{{ contract.manager.name }}</td>
+                    <td>{{ contract.status.value }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">Договоров пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
