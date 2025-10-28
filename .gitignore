@@ -1,0 +1,14 @@
+# venv
+.venv/
+venv/
+
+# Database
+instance/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE specific
+.idea/
+.vscode/

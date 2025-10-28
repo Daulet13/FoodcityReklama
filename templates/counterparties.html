@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Контрагенты{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Контрагенты</h1>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Добавить нового контрагента
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="brand_name" class="form-label">Бренд</label>
+                        <input type="text" class="form-control" id="brand_name" name="brand_name" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="type" class="form-label">Тип организации</label>
+                        <select class="form-select" id="type" name="type" required>
+                            {% for type in types %}
+                            <option value="{{ type.name }}">{{ type.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="full_name" class="form-label">Полное название</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" required>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Список контрагентов
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Бренд</th>
+                        <th>Полное название</th>
+                        <th>Тип</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cp in counterparties %}
+                    <tr>
+                        <td>{{ cp.brand_name }}</td>
+                        <td>{{ cp.full_name }}</td>
+                        <td>{{ cp.type.value }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center">Контрагентов пока нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
