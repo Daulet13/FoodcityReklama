@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
+from datetime import datetime
+from sqlalchemy import extract
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key' # Добавьте секретный ключ для сессий и флеш-сообщений
@@ -15,8 +17,8 @@ migrate = Migrate(app, db)
 from models import (db, User, Counterparty, CounterpartyType, Role,
                     PropertyObject, PropertyObjectType, ServiceType, BusinessCategory,
                     PropertyObjectTypeEnum, ServiceTypeEnum, BusinessCategoryEnum,
-                    Contract, ContractStatus, Specification)
-from datetime import datetime
+                    Contract, ContractStatus, Specification, SpecificationService, BillingType,
+                    Realization, RealizationService, RealizationSource, PaymentType)
 
 @app.cli.command('init-db')
 def init_db_command():
@@ -130,19 +132,128 @@ def contract_detail(contract_id):
     contract = Contract.query.get_or_404(contract_id)
 
     if request.method == 'POST':
-        # Добавление новой спецификации
-        new_spec = Specification(
-            number=request.form['number'],
-            start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
-            end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d').date(),
-            description=request.form.get('description'),
-            contract_id=contract.id
-        )
-        db.session.add(new_spec)
+        # Определяем, какая форма была отправлена
+        form_type = request.form.get('form_type')
+
+        if form_type == 'add_specification':
+            new_spec = Specification(
+                number=request.form['number'],
+                start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
+                end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d').date(),
+                description=request.form.get('description'),
+                contract_id=contract.id
+            )
+            db.session.add(new_spec)
+
+        elif form_type == 'add_service':
+            spec_id = request.form.get('specification_id')
+            new_service = SpecificationService(
+                specification_id=spec_id,
+                service_type_id=request.form['service_type_id'],
+                property_object_id=request.form.get('property_object_id') or None,
+                description=request.form.get('description'),
+                billing_type=BillingType[request.form['billing_type']],
+                start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
+                end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d').date() if request.form['end_date'] else None,
+                amount=request.form['amount']
+            )
+            db.session.add(new_service)
+        
         db.session.commit()
         return redirect(url_for('contract_detail', contract_id=contract.id))
 
-    return render_template('contract_detail.html', contract=contract)
+    # Данные для форм
+    service_types = ServiceType.query.all()
+    property_objects = PropertyObject.query.all()
+    billing_types = list(BillingType)
+
+    return render_template('contract_detail.html', 
+                           contract=contract,
+                           service_types=service_types,
+                           property_objects=property_objects,
+                           billing_types=billing_types)
+
+@app.route('/realizations', methods=['GET', 'POST'])
+def realizations_list():
+    if request.method == 'POST':
+        # Логика для создания разовой реализации (пока заглушка)
+        pass
+    realizations = Realization.query.order_by(Realization.date.desc()).all()
+    return render_template('realizations.html', realizations=realizations, now=datetime.now())
+
+@app.route('/generate-realizations', methods=['POST'])
+def generate_realizations():
+    month_year_str = request.form.get('month')
+    if not month_year_str:
+        flash('Необходимо выбрать месяц для генерации.', 'danger')
+        return redirect(url_for('realizations_list'))
+
+    year, month = map(int, month_year_str.split('-'))
+    
+    # 1. Найти все активные договоры
+    active_contracts = Contract.query.filter_by(status=ContractStatus.ACTIVE).all()
+    
+    generated_count = 0
+
+    for contract in active_contracts:
+        # 2. Найти все подходящие спецификации
+        specs = Specification.query.filter(
+            Specification.contract_id == contract.id,
+            extract('year', Specification.start_date) <= year,
+            extract('month', Specification.start_date) <= month,
+            extract('year', Specification.end_date) >= year,
+            extract('month', Specification.end_date) >= month
+        ).all()
+
+        for spec in specs:
+            # 3. Найти все ежемесячные услуги
+            monthly_services = SpecificationService.query.filter_by(
+                specification_id=spec.id,
+                billing_type=BillingType.MONTHLY
+            ).all()
+
+            for service in monthly_services:
+                 # 4. Проверить, не создана ли уже реализация
+                exists = Realization.query.filter_by(
+                    contract_id=contract.id,
+                    specification_id=spec.id,
+                    month=month,
+                    year=year
+                ).join(RealizationService).filter(RealizationService.description == service.description).count() > 0
+
+                if not exists:
+                    # 5. Создать реализацию
+                    new_realization = Realization(
+                        date=datetime(year, month, 1),
+                        source=RealizationSource.AUTO,
+                        month=month,
+                        year=year,
+                        payment_type=PaymentType.NON_CASH,
+                        counterparty_id=contract.counterparty_id,
+                        contract_id=contract.id,
+                        specification_id=spec.id,
+                        manager_id=contract.manager_id,
+                    )
+                    
+                    realization_service = RealizationService(
+                        description=service.description,
+                        sale_amount=service.amount,
+                        property_object_id=service.property_object_id,
+                        service_type_id=service.service_type_id,
+                        realization=new_realization
+                    )
+                    
+                    db.session.add(new_realization)
+                    db.session.add(realization_service)
+                    generated_count += 1
+    
+    if generated_count > 0:
+        db.session.commit()
+        flash(f'Успешно сгенерировано {generated_count} новых реализаций за {month:02}.{year}.', 'success')
+    else:
+        flash(f'Новых реализаций для генерации за {month:02}.{year} не найдено.', 'info')
+
+    return redirect(url_for('realizations_list'))
 
 
 if __name__ == '__main__':

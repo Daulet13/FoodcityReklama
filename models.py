@@ -1,5 +1,6 @@
 from app import db
 import enum
+from datetime import datetime
 
 
 class Role(enum.Enum):
@@ -48,6 +49,20 @@ class ContractStatus(enum.Enum):
 class BillingType(enum.Enum):
     MONTHLY = 'Ежемесячное'
     ONE_TIME = 'Разовое'
+
+class RealizationSource(enum.Enum):
+    AUTO = 'По договору/спецификации (автоматически)'
+    MANUAL = 'По договору/спецификации (вручную)'
+    ONCE = 'Разовая (без договора)'
+
+class PaymentType(enum.Enum):
+    CASH = 'Наличные'
+    NON_CASH = 'Безналичный'
+
+class PaymentStatus(enum.Enum):
+    NOT_PAID = 'Не оплачено'
+    PARTIALLY_PAID = 'Частично оплачено'
+    PAID = 'Оплачено'
 
 
 class User(db.Model):
@@ -156,3 +171,49 @@ class SpecificationService(db.Model):
     
     def __repr__(self):
         return f'<SpecificationService {self.id}>'
+
+class Realization(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.String(50), unique=True, nullable=False, default=lambda: str(datetime.now().timestamp())) # Временный авто-номер
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    source = db.Column(db.Enum(RealizationSource), nullable=False)
+    month = db.Column(db.Integer) # Месяц реализации (1-12)
+    year = db.Column(db.Integer) # Год реализации
+    payment_type = db.Column(db.Enum(PaymentType), nullable=False)
+    payment_status = db.Column(db.Enum(PaymentStatus), default=PaymentStatus.NOT_PAID, nullable=False)
+
+    counterparty_id = db.Column(db.Integer, db.ForeignKey('counterparty.id'), nullable=False)
+    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'))
+    specification_id = db.Column(db.Integer, db.ForeignKey('specification.id'))
+    manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    counterparty = db.relationship('Counterparty', backref='realizations')
+    contract = db.relationship('Contract', backref='realizations')
+    specification = db.relationship('Specification', backref='realizations')
+    manager = db.relationship('User', backref='realizations')
+
+    @property
+    def total_sale(self):
+        return sum(service.sale_amount for service in self.services)
+
+    @property
+    def total_expense(self):
+        return sum(service.expense_amount for service in self.services)
+    
+    @property
+    def total_profit(self):
+        return self.total_sale - self.total_expense
+
+class RealizationService(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.Text)
+    sale_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    expense_amount = db.Column(db.Numeric(10, 2), default=0)
+    
+    realization_id = db.Column(db.Integer, db.ForeignKey('realization.id'), nullable=False)
+    property_object_id = db.Column(db.Integer, db.ForeignKey('property_object.id'))
+    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'), nullable=False)
+    
+    realization = db.relationship('Realization', backref=db.backref('services', cascade="all, delete-orphan"))
+    property_object = db.relationship('PropertyObject')
+    service_type = db.relationship('ServiceType')

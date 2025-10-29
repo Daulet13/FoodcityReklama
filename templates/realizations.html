@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Реализации{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Реализации</h1>
+    <div class="d-flex align-items-center gap-2">
+        <form action="{{ url_for('generate_realizations') }}" method="post" class="d-flex align-items-center gap-2">
+            <input type="month" name="month" class="form-control" value="{{ now.strftime('%Y-%m') }}">
+            <button type="submit" class="btn btn-primary text-nowrap">Сформировать за месяц</button>
+        </form>
+        <button class="btn btn-secondary text-nowrap">+ Новая разовая</button>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+    <div class="card-header">
+        Список всех реализаций
+    </div>
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Контрагент</th>
+                    <th>Источник</th>
+                    <th>Сумма</th>
+                    <th>Расходы</th>
+                    <th>Прибыль</th>
+                    <th>Статус оплаты</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in realizations %}
+                <tr>
+                    <td>{{ r.number }}</td>
+                    <td>{{ r.date.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ r.counterparty.brand_name }}</td>
+                    <td>{{ r.source.value }}</td>
+                    <td class="text-end">{{ "%.2f"|format(r.total_sale) }}</td>
+                    <td class="text-end">{{ "%.2f"|format(r.total_expense) }}</td>
+                    <td class="text-end fw-bold">{{ "%.2f"|format(r.total_profit) }}</td>
+                    <td><span class="badge bg-warning text-dark">{{ r.payment_status.value }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center">Реализаций пока нет.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
