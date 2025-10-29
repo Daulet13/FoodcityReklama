@@ -20,6 +20,12 @@ from models import (db, User, Counterparty, CounterpartyType, Role,
                     Contract, ContractStatus, Specification, SpecificationService, BillingType,
                     Realization, RealizationService, RealizationSource, PaymentType)
 
+def parse_date(value: str):
+    value = (value or '').strip()
+    if not value:
+        return None
+    return datetime.strptime(value, '%d/%m/%Y').date()
+
 @app.cli.command('init-db')
 def init_db_command():
     """Initializes the database with dictionary values."""
@@ -64,68 +70,168 @@ def hello_world():
 
 @app.route('/counterparties', methods=['GET', 'POST'])
 def counterparties_list():
+    types = list(CounterpartyType)
+
     if request.method == 'POST':
-        new_counterparty = Counterparty(
-            brand_name=request.form['brand_name'],
-            full_name=request.form['full_name'],
-            type=CounterpartyType[request.form['type']]
-        )
-        db.session.add(new_counterparty)
-        db.session.commit()
+        form_type = request.form.get('form_type', 'create')
+
+        if form_type == 'create':
+            new_counterparty = Counterparty(
+                brand_name=request.form['brand_name'],
+                full_name=request.form['full_name'],
+                type=CounterpartyType[request.form['type']]
+            )
+            db.session.add(new_counterparty)
+            db.session.commit()
+            flash('Контрагент добавлен.', 'success')
+
+        elif form_type == 'update':
+            counterparty_id = int(request.form.get('counterparty_id'))
+            counterparty = Counterparty.query.get_or_404(counterparty_id)
+            counterparty.brand_name = request.form['brand_name']
+            counterparty.full_name = request.form['full_name']
+            counterparty.type = CounterpartyType[request.form['type']]
+            db.session.commit()
+            flash('Изменения сохранены.', 'success')
+
+        elif form_type == 'delete':
+            counterparty_id = int(request.form.get('counterparty_id'))
+            counterparty = Counterparty.query.get_or_404(counterparty_id)
+
+            if counterparty.contracts:
+                flash('Нельзя удалить контрагента: имеются связанные договоры.', 'danger')
+            else:
+                db.session.delete(counterparty)
+                db.session.commit()
+                flash('Контрагент удален.', 'success')
+
         return redirect(url_for('counterparties_list'))
 
-    all_counterparties = Counterparty.query.all()
-    types = list(CounterpartyType)
+    all_counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
     return render_template('counterparties.html', counterparties=all_counterparties, types=types)
 
 @app.route('/property-objects', methods=['GET', 'POST'])
 def property_objects_list():
+    object_types = PropertyObjectType.query.order_by(PropertyObjectType.name).all()
+
     if request.method == 'POST':
-        new_object = PropertyObject(
-            name=request.form['name'],
-            type_id=request.form['type_id'],
-            characteristics=request.form.get('characteristics'),
-            location=request.form.get('location')
-        )
-        db.session.add(new_object)
-        db.session.commit()
+        form_type = request.form.get('form_type', 'create')
+
+        if form_type == 'create':
+            new_object = PropertyObject(
+                name=request.form['name'],
+                type_id=int(request.form['type_id']),
+                characteristics=request.form.get('characteristics'),
+                location=request.form.get('location')
+            )
+            db.session.add(new_object)
+            db.session.commit()
+            flash('Объект добавлен.', 'success')
+
+        elif form_type == 'update':
+            object_id = int(request.form.get('object_id'))
+            obj = PropertyObject.query.get_or_404(object_id)
+            obj.name = request.form['name']
+            obj.type_id = int(request.form['type_id'])
+            obj.location = request.form.get('location')
+            obj.characteristics = request.form.get('characteristics')
+            db.session.commit()
+            flash('Изменения сохранены.', 'success')
+
+        elif form_type == 'delete':
+            object_id = int(request.form.get('object_id'))
+            obj = PropertyObject.query.get_or_404(object_id)
+
+            spec_usage = SpecificationService.query.filter_by(property_object_id=obj.id).count()
+            realization_usage = RealizationService.query.filter_by(property_object_id=obj.id).count()
+
+            if spec_usage or realization_usage:
+                flash('Нельзя удалить объект: он используется в спецификациях или реализациях.', 'danger')
+            else:
+                db.session.delete(obj)
+                db.session.commit()
+                flash('Объект удален.', 'success')
+
         return redirect(url_for('property_objects_list'))
     
-    all_objects = PropertyObject.query.all()
-    object_types = PropertyObjectType.query.all()
+    all_objects = PropertyObject.query.order_by(PropertyObject.name).all()
+    usage_map = {
+        obj.id: SpecificationService.query.filter_by(property_object_id=obj.id).count() +
+                 RealizationService.query.filter_by(property_object_id=obj.id).count()
+        for obj in all_objects
+    }
     return render_template('property_objects.html', 
                            objects=all_objects, 
-                           object_types=object_types)
+                           object_types=object_types,
+                           usage_map=usage_map)
 
 @app.route('/contracts', methods=['GET', 'POST'])
 def contracts_list():
+    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
+    managers = User.query.filter_by(role=Role.MANAGER).order_by(User.name).all()
+    categories = BusinessCategory.query.order_by(BusinessCategory.name).all()
+    statuses = list(ContractStatus)
+
     if request.method == 'POST':
-        new_contract = Contract(
-            number=request.form['number'],
-            date=datetime.strptime(request.form['date'], '%Y-%m-%d').date(),
-            app_end_date=datetime.strptime(request.form['app_end_date'], '%Y-%m-%d').date() if request.form['app_end_date'] else None,
-            pavilion_number=request.form.get('pavilion_number'),
-            status=ContractStatus[request.form['status']],
-            counterparty_id=request.form['counterparty_id'],
-            manager_id=request.form['manager_id'],
-            category_id=request.form['category_id']
-        )
-        db.session.add(new_contract)
-        db.session.commit()
+        form_type = request.form.get('form_type', 'create')
+
+        if form_type == 'create':
+            new_contract = Contract(
+                number=request.form['number'],
+                date=parse_date(request.form['date']),
+                app_end_date=parse_date(request.form.get('app_end_date')),
+                pavilion_number=request.form.get('pavilion_number') or None,
+                status=ContractStatus[request.form['status']],
+                counterparty_id=int(request.form['counterparty_id']),
+                manager_id=int(request.form['manager_id']),
+                category_id=int(request.form['category_id'])
+            )
+            db.session.add(new_contract)
+            db.session.commit()
+            flash('Договор добавлен.', 'success')
+
+        elif form_type == 'update':
+            contract_id = int(request.form.get('contract_id'))
+            contract = Contract.query.get_or_404(contract_id)
+            contract.number = request.form['number']
+            contract.date = parse_date(request.form['date'])
+            contract.app_end_date = parse_date(request.form.get('app_end_date'))
+            contract.pavilion_number = request.form.get('pavilion_number') or None
+            contract.status = ContractStatus[request.form['status']]
+            contract.counterparty_id = int(request.form['counterparty_id'])
+            contract.manager_id = int(request.form['manager_id'])
+            contract.category_id = int(request.form['category_id'])
+            db.session.commit()
+            flash('Изменения по договору сохранены.', 'success')
+
+        elif form_type == 'delete':
+            contract_id = int(request.form.get('contract_id'))
+            contract = Contract.query.get_or_404(contract_id)
+            if contract.specifications or contract.realizations:
+                flash('Нельзя удалить договор: есть связанные спецификации или реализации.', 'danger')
+            else:
+                db.session.delete(contract)
+                db.session.commit()
+                flash('Договор удален.', 'success')
+
         return redirect(url_for('contracts_list'))
 
-    contracts = Contract.query.all()
-    counterparties = Counterparty.query.all()
-    managers = User.query.filter_by(role=Role.MANAGER).all()
-    categories = BusinessCategory.query.all()
-    statuses = list(ContractStatus)
-    
+    contracts = Contract.query.order_by(Contract.date.desc()).all()
+    usage_map = {
+        contract.id: {
+            'specifications': len(contract.specifications),
+            'realizations': len(contract.realizations)
+        }
+        for contract in contracts
+    }
+
     return render_template('contracts.html', 
                            contracts=contracts,
                            counterparties=counterparties,
                            managers=managers,
                            categories=categories,
-                           statuses=statuses)
+                           statuses=statuses,
+                           usage_map=usage_map)
 
 @app.route('/contract/<int:contract_id>', methods=['GET', 'POST'])
 def contract_detail(contract_id):
@@ -135,43 +241,119 @@ def contract_detail(contract_id):
         # Определяем, какая форма была отправлена
         form_type = request.form.get('form_type')
 
-        if form_type == 'add_specification':
+        if form_type == 'update_contract':
+            contract.number = request.form['number']
+            contract.date = parse_date(request.form['date'])
+            contract.app_end_date = parse_date(request.form.get('app_end_date'))
+            contract.pavilion_number = request.form.get('pavilion_number') or None
+            contract.status = ContractStatus[request.form['status']]
+            contract.counterparty_id = int(request.form['counterparty_id'])
+            contract.manager_id = int(request.form['manager_id'])
+            contract.category_id = int(request.form['category_id'])
+            db.session.commit()
+            flash('Договор обновлён.', 'success')
+
+        elif form_type == 'delete_contract':
+            if contract.specifications or contract.realizations:
+                flash('Нельзя удалить договор: есть связанные спецификации или реализации.', 'danger')
+                return redirect(url_for('contract_detail', contract_id=contract.id))
+            db.session.delete(contract)
+            db.session.commit()
+            flash('Договор удалён.', 'success')
+            return redirect(url_for('contracts_list'))
+
+        elif form_type == 'add_specification':
             new_spec = Specification(
                 number=request.form['number'],
-                start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
-                end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d').date(),
+                start_date=parse_date(request.form['start_date']),
+                end_date=parse_date(request.form['end_date']),
                 description=request.form.get('description'),
                 contract_id=contract.id
             )
             db.session.add(new_spec)
+            db.session.commit()
+            flash('Спецификация добавлена.', 'success')
+
+        elif form_type == 'update_specification':
+            spec = Specification.query.get_or_404(int(request.form['specification_id']))
+            spec.number = request.form['number']
+            spec.start_date = parse_date(request.form['start_date'])
+            spec.end_date = parse_date(request.form['end_date'])
+            spec.description = request.form.get('description')
+            db.session.commit()
+            flash('Спецификация обновлена.', 'success')
+
+        elif form_type == 'delete_specification':
+            spec = Specification.query.get_or_404(int(request.form['specification_id']))
+            if spec.services or spec.realizations:
+                flash('Нельзя удалить спецификацию: есть связанные услуги или реализации.', 'danger')
+            else:
+                db.session.delete(spec)
+                db.session.commit()
+                flash('Спецификация удалена.', 'success')
 
         elif form_type == 'add_service':
-            spec_id = request.form.get('specification_id')
+            spec_id = int(request.form.get('specification_id'))
             new_service = SpecificationService(
                 specification_id=spec_id,
-                service_type_id=request.form['service_type_id'],
-                property_object_id=request.form.get('property_object_id') or None,
+                service_type_id=int(request.form['service_type_id']),
+                property_object_id=int(request.form['property_object_id']) if request.form.get('property_object_id') else None,
                 description=request.form.get('description'),
                 billing_type=BillingType[request.form['billing_type']],
-                start_date=datetime.strptime(request.form['start_date'], '%Y-%m-%d').date(),
-                end_date=datetime.strptime(request.form['end_date'], '%Y-%m-%d').date() if request.form['end_date'] else None,
+                start_date=parse_date(request.form['start_date']),
+                end_date=parse_date(request.form.get('end_date')),
                 amount=request.form['amount']
             )
             db.session.add(new_service)
-        
-        db.session.commit()
+            db.session.commit()
+            flash('Услуга добавлена.', 'success')
+
+        elif form_type == 'update_service':
+            service = SpecificationService.query.get_or_404(int(request.form['service_id']))
+            service.service_type_id = int(request.form['service_type_id'])
+            service.property_object_id = int(request.form['property_object_id']) if request.form.get('property_object_id') else None
+            service.description = request.form.get('description')
+            service.billing_type = BillingType[request.form['billing_type']]
+            service.start_date = parse_date(request.form['start_date'])
+            service.end_date = parse_date(request.form.get('end_date'))
+            service.amount = request.form['amount']
+            db.session.commit()
+            flash('Услуга обновлена.', 'success')
+
+        elif form_type == 'delete_service':
+            service = SpecificationService.query.get_or_404(int(request.form['service_id']))
+            db.session.delete(service)
+            db.session.commit()
+            flash('Услуга удалена.', 'success')
+
         return redirect(url_for('contract_detail', contract_id=contract.id))
 
     # Данные для форм
     service_types = ServiceType.query.all()
     property_objects = PropertyObject.query.all()
     billing_types = list(BillingType)
+    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
+    managers = User.query.filter_by(role=Role.MANAGER).order_by(User.name).all()
+    categories = BusinessCategory.query.order_by(BusinessCategory.name).all()
+    statuses = list(ContractStatus)
+    spec_usage = {
+        spec.id: {
+            'services': len(spec.services),
+            'realizations': len(spec.realizations)
+        }
+        for spec in contract.specifications
+    }
 
     return render_template('contract_detail.html', 
                            contract=contract,
                            service_types=service_types,
                            property_objects=property_objects,
-                           billing_types=billing_types)
+                           billing_types=billing_types,
+                           counterparties=counterparties,
+                           managers=managers,
+                           categories=categories,
+                           statuses=statuses,
+                           spec_usage=spec_usage)
 
 @app.route('/realizations', methods=['GET', 'POST'])
 def realizations_list():

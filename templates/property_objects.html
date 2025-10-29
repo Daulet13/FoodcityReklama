@@ -11,6 +11,7 @@
         </div>
         <div class="card-body">
             <form method="post">
+                <input type="hidden" name="form_type" value="create">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label for="name" class="form-label">Название объекта</label>
@@ -53,6 +54,7 @@
                         <th>Тип</th>
                         <th>Расположение</th>
                         <th>Характеристики</th>
+                        <th class="text-end">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -62,14 +64,95 @@
                         <td>{{ obj.type.name.value }}</td>
                         <td>{{ obj.location }}</td>
                         <td>{{ obj.characteristics }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editObjectModal{{ obj.id }}">
+                                    Изменить
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteObjectModal{{ obj.id }}">
+                                    Удалить
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center">Объектов пока нет</td>
+                        <td colspan="5" class="text-center">Объектов пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    {% for obj in objects %}
+    <!-- Модалка редактирования -->
+    <div class="modal fade" id="editObjectModal{{ obj.id }}" tabindex="-1" aria-labelledby="editObjectLabel{{ obj.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="form_type" value="update">
+                    <input type="hidden" name="object_id" value="{{ obj.id }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editObjectLabel{{ obj.id }}">Редактировать объект</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="object_name_{{ obj.id }}" class="form-label">Название</label>
+                            <input type="text" class="form-control" id="object_name_{{ obj.id }}" name="name" value="{{ obj.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="object_type_{{ obj.id }}" class="form-label">Тип</label>
+                            <select class="form-select" id="object_type_{{ obj.id }}" name="type_id" required>
+                                {% for type in object_types %}
+                                <option value="{{ type.id }}" {% if type.id == obj.type_id %}selected{% endif %}>{{ type.name.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="object_location_{{ obj.id }}" class="form-label">Расположение</label>
+                            <input type="text" class="form-control" id="object_location_{{ obj.id }}" name="location" value="{{ obj.location }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="object_characteristics_{{ obj.id }}" class="form-label">Характеристики</label>
+                            <input type="text" class="form-control" id="object_characteristics_{{ obj.id }}" name="characteristics" value="{{ obj.characteristics }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Модалка удаления -->
+    <div class="modal fade" id="deleteObjectModal{{ obj.id }}" tabindex="-1" aria-labelledby="deleteObjectLabel{{ obj.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="form_type" value="delete">
+                    <input type="hidden" name="object_id" value="{{ obj.id }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteObjectLabel{{ obj.id }}">Удалить объект</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Удалить объект <strong>{{ obj.name }}</strong>?</p>
+                        {% if usage_map[obj.id] %}
+                        <div class="alert alert-warning" role="alert">
+                            Невозможно удалить: объект используется в {{ usage_map[obj.id] }} документах.
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger" {% if usage_map[obj.id] %}disabled{% endif %}>Удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 {% endblock %}

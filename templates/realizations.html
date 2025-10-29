@@ -47,7 +47,7 @@
                 {% for r in realizations %}
                 <tr>
                     <td>{{ r.number }}</td>
-                    <td>{{ r.date.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                     <td>{{ r.counterparty.brand_name }}</td>
                     <td>{{ r.source.value }}</td>
                     <td class="text-end">{{ "%.2f"|format(r.total_sale) }}</td>

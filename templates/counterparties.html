@@ -11,6 +11,7 @@
         </div>
         <div class="card-body">
             <form method="post">
+                <input type="hidden" name="form_type" value="create">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label for="brand_name" class="form-label">Бренд</label>
@@ -47,6 +48,7 @@
                         <th>Бренд</th>
                         <th>Полное название</th>
                         <th>Тип</th>
+                        <th class="text-end">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -55,14 +57,91 @@
                         <td>{{ cp.brand_name }}</td>
                         <td>{{ cp.full_name }}</td>
                         <td>{{ cp.type.value }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCounterpartyModal{{ cp.id }}">
+                                    Изменить
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCounterpartyModal{{ cp.id }}">
+                                    Удалить
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="3" class="text-center">Контрагентов пока нет</td>
+                        <td colspan="4" class="text-center">Контрагентов пока нет</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+
+    {% for cp in counterparties %}
+    <!-- Модалка редактирования -->
+    <div class="modal fade" id="editCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="editCounterpartyLabel{{ cp.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="form_type" value="update">
+                    <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editCounterpartyLabel{{ cp.id }}">Редактировать контрагента</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="brand_name_{{ cp.id }}" class="form-label">Бренд</label>
+                            <input type="text" class="form-control" id="brand_name_{{ cp.id }}" name="brand_name" value="{{ cp.brand_name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="full_name_{{ cp.id }}" class="form-label">Полное название</label>
+                            <input type="text" class="form-control" id="full_name_{{ cp.id }}" name="full_name" value="{{ cp.full_name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="type_{{ cp.id }}" class="form-label">Тип организации</label>
+                            <select class="form-select" id="type_{{ cp.id }}" name="type" required>
+                                {% for type in types %}
+                                <option value="{{ type.name }}" {% if type == cp.type %}selected{% endif %}>{{ type.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Модалка удаления -->
+    <div class="modal fade" id="deleteCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="deleteCounterpartyLabel{{ cp.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="form_type" value="delete">
+                    <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteCounterpartyLabel{{ cp.id }}">Удалить контрагента</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Вы уверены, что хотите удалить контрагента <strong>{{ cp.brand_name }}</strong>?</p>
+                        {% if cp.contracts %}
+                        <div class="alert alert-warning" role="alert">
+                            Невозможно удалить: есть связанные договоры ({{ cp.contracts|length }}).
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger" {% if cp.contracts %}disabled{% endif %}>Удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 {% endblock %}
