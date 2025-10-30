@@ -38,7 +38,7 @@ try:
     
     # Create new branch
     print("3. Создаю новую ветку...")
-    branch_name = "реорганизация реизаций с помощью composer"
+    branch_name = "reorganize-realizations-with-composer"
     result = subprocess.run(['git', 'branch', branch_name], capture_output=True, text=True)
     if result.returncode != 0:
         print(f"[ERROR] {result.stderr}")
