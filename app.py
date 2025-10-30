@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
 from datetime import datetime, date, timedelta
+from decimal import Decimal, InvalidOperation
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key' # Добавьте секретный ключ для сессий и флеш-сообщений
@@ -23,7 +24,12 @@ def parse_date(value: str):
     value = (value or '').strip()
     if not value:
         return None
-    return datetime.strptime(value, '%d/%m/%Y').date()
+    try:
+        # Сначала пробуем наш основной формат dd/mm/yyyy
+        return datetime.strptime(value, '%d/%m/%Y').date()
+    except ValueError:
+        # Если не получилось, пробуем стандартный формат YYYY-MM-DD
+        return datetime.strptime(value, '%Y-%m-%d').date()
 
 @app.cli.command('init-db')
 def init_db_command():
@@ -390,34 +396,242 @@ def contract_detail(contract_id):
 
 @app.route('/realizations', methods=['GET', 'POST'])
 def realizations_list():
+    one_off_form_data = None
+
     if request.method == 'POST':
         form_type = request.form.get('form_type')
         
         if form_type == 'update_realization':
             realization = Realization.query.get_or_404(int(request.form['realization_id']))
             realization.date = parse_date(request.form['date'])
+            realization.month = realization.date.month
+            realization.year = realization.date.year
             realization.payment_type = PaymentType[request.form['payment_type']]
             realization.payment_status = PaymentStatus[request.form['payment_status']]
             db.session.commit()
             flash('Реализация обновлена.', 'success')
+            return redirect(url_for('realizations_list'))
             
         elif form_type == 'delete_realization':
             realization = Realization.query.get_or_404(int(request.form['realization_id']))
-            # Проверка зависимостей: услуги реализации будут удалены каскадом
             db.session.delete(realization)
             db.session.commit()
             flash('Реализация удалена.', 'success')
-            
-        return redirect(url_for('realizations_list'))
-    
+            return redirect(url_for('realizations_list'))
+
+        elif form_type == 'create_one_off':
+            form = request.form
+            one_off_form_data = form.to_dict()
+            has_error = False
+
+            try:
+                realization_date = parse_date(form['date'])
+            except (ValueError, KeyError):
+                flash('Неверный формат даты.', 'danger')
+                has_error = True
+                realization_date = None
+
+            counterparty_id = form.get('counterparty_id')
+            if not counterparty_id:
+                flash('Укажите контрагента.', 'danger')
+                has_error = True
+            else:
+                try:
+                    counterparty_id = int(counterparty_id)
+                except ValueError:
+                    counterparty_id = None
+                    flash('Указан некорректный контрагент.', 'danger')
+                    has_error = True
+
+            contract = None
+            contract_id_raw = form.get('contract_id')
+            if contract_id_raw:
+                try:
+                    contract = Contract.query.get(int(contract_id_raw))
+                    if not contract:
+                        flash('Выбранный договор не найден.', 'danger')
+                        has_error = True
+                    elif counterparty_id and contract.counterparty_id != counterparty_id:
+                        flash('Договор не принадлежит выбранному контрагенту.', 'danger')
+                        has_error = True
+                        contract = None
+                except ValueError:
+                    flash('Указан некорректный договор.', 'danger')
+                    has_error = True
+
+            specification = None
+            specification_id_raw = form.get('specification_id')
+            if specification_id_raw:
+                try:
+                    specification = Specification.query.get(int(specification_id_raw))
+                    if not specification:
+                        flash('Выбранная спецификация не найдена.', 'danger')
+                        has_error = True
+                    elif contract and specification.contract_id != contract.id:
+                        flash('Спецификация не относится к выбранному договору.', 'danger')
+                        has_error = True
+                        specification = None
+                    elif not contract and specification:
+                        contract = specification.contract
+                        one_off_form_data['contract_id'] = str(contract.id)
+                except ValueError:
+                    flash('Указана некорректная спецификация.', 'danger')
+                    has_error = True
+
+            manager_id = form.get('manager_id')
+            manager = None
+            if manager_id:
+                try:
+                    manager = User.query.get(int(manager_id))
+                    if not manager:
+                        flash('Выбранный менеджер не найден.', 'danger')
+                        has_error = True
+                except ValueError:
+                    flash('Указан некорректный менеджер.', 'danger')
+                    has_error = True
+            elif contract:
+                manager = contract.manager
+                manager_id = contract.manager_id
+                one_off_form_data['manager_id'] = str(manager_id)
+            else:
+                flash('Укажите менеджера.', 'danger')
+                has_error = True
+
+            payment_type_name = form.get('payment_type')
+            payment_status_name = form.get('payment_status', PaymentStatus.NOT_PAID.name)
+            try:
+                payment_type = PaymentType[payment_type_name]
+            except KeyError:
+                payment_type = None
+                flash('Выберите корректный тип оплаты.', 'danger')
+                has_error = True
+
+            try:
+                payment_status = PaymentStatus[payment_status_name]
+            except KeyError:
+                payment_status = PaymentStatus.NOT_PAID
+
+            service_type_id = form.get('service_type_id')
+            service_type = None
+            if service_type_id:
+                try:
+                    service_type = ServiceType.query.get(int(service_type_id))
+                    if not service_type:
+                        flash('Выбранный тип услуги не найден.', 'danger')
+                        has_error = True
+                except ValueError:
+                    flash('Указан некорректный тип услуги.', 'danger')
+                    has_error = True
+            else:
+                flash('Выберите тип услуги.', 'danger')
+                has_error = True
+
+            property_object_id = form.get('property_object_id') or None
+            if property_object_id:
+                try:
+                    property_object = PropertyObject.query.get(int(property_object_id))
+                    if not property_object:
+                        flash('Выбранный объект не найден.', 'danger')
+                        has_error = True
+                        property_object_id = None
+                except ValueError:
+                    flash('Указан некорректный объект.', 'danger')
+                    has_error = True
+                    property_object_id = None
+
+            description = form.get('description')
+
+            sale_amount = None
+            try:
+                sale_amount = Decimal(form.get('sale_amount', '0').replace(',', '.'))
+                if sale_amount <= 0:
+                    flash('Сумма продажи должна быть больше нуля.', 'danger')
+                    has_error = True
+                    sale_amount = None
+            except (InvalidOperation, AttributeError):
+                flash('Укажите корректную сумму продажи.', 'danger')
+                has_error = True
+
+            expense_amount = Decimal('0')
+            expense_raw = form.get('expense_amount')
+            if expense_raw:
+                try:
+                    expense_amount = Decimal(expense_raw.replace(',', '.'))
+                    if expense_amount < 0:
+                        flash('Расходы не могут быть отрицательными.', 'danger')
+                        has_error = True
+                        expense_amount = Decimal('0')
+                except InvalidOperation:
+                    flash('Укажите корректную сумму расходов.', 'danger')
+                    has_error = True
+                    expense_amount = Decimal('0')
+
+            if has_error or not all([realization_date, counterparty_id, manager, payment_type, service_type, sale_amount]):
+                return render_template(
+                    'realizations.html',
+                    realizations=Realization.query.order_by(Realization.date.desc()).all(),
+                    payment_types=list(PaymentType),
+                    payment_statuses=list(PaymentStatus),
+                    counterparties=Counterparty.query.order_by(Counterparty.brand_name).all(),
+                    contracts=Contract.query.order_by(Contract.number).all(),
+                    specifications=Specification.query.order_by(Specification.number).all(),
+                    managers=User.query.filter_by(role=Role.MANAGER).order_by(User.name).all(),
+                    service_types=ServiceType.query.order_by(ServiceType.name).all(),
+                    property_objects=PropertyObject.query.order_by(PropertyObject.name).all(),
+                    now=datetime.now(),
+                    one_off_form_data=one_off_form_data
+                )
+
+            realization = Realization(
+                date=realization_date,
+                month=realization_date.month,
+                year=realization_date.year,
+                source=RealizationSource.MANUAL,
+                payment_type=payment_type,
+                payment_status=payment_status,
+                counterparty_id=counterparty_id,
+                contract_id=contract.id if contract else None,
+                specification_id=specification.id if specification else None,
+                manager_id=manager.id
+            )
+
+            service = RealizationService(
+                description=description,
+                sale_amount=sale_amount,
+                expense_amount=expense_amount,
+                property_object_id=int(property_object_id) if property_object_id else None,
+                service_type_id=service_type.id,
+                realization=realization
+            )
+
+            db.session.add(realization)
+            db.session.add(service)
+            db.session.commit()
+            flash('Разовая реализация создана.', 'success')
+            return redirect(url_for('realizations_list'))
+
     realizations = Realization.query.order_by(Realization.date.desc()).all()
     payment_types = list(PaymentType)
     payment_statuses = list(PaymentStatus)
+    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
+    contracts = Contract.query.order_by(Contract.number).all()
+    specifications = Specification.query.order_by(Specification.number).all()
+    managers = User.query.filter_by(role=Role.MANAGER).order_by(User.name).all()
+    service_types = ServiceType.query.order_by(ServiceType.name).all()
+    property_objects = PropertyObject.query.order_by(PropertyObject.name).all()
+
     return render_template('realizations.html', 
                           realizations=realizations, 
                           payment_types=payment_types,
                           payment_statuses=payment_statuses,
-                          now=datetime.now())
+                          counterparties=counterparties,
+                          contracts=contracts,
+                          specifications=specifications,
+                          managers=managers,
+                          service_types=service_types,
+                          property_objects=property_objects,
+                          now=datetime.now(),
+                          one_off_form_data=one_off_form_data)
 
 @app.route('/generate-realizations', methods=['POST'])
 def generate_realizations():

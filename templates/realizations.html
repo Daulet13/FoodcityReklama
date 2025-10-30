@@ -10,7 +10,7 @@
             <input type="month" name="month" class="form-control" value="{{ now.strftime('%Y-%m') }}">
             <button type="submit" class="btn btn-primary text-nowrap">Сформировать за месяц</button>
         </form>
-        <button class="btn btn-secondary text-nowrap">+ Новая разовая</button>
+        <button class="btn btn-secondary text-nowrap" data-bs-toggle="modal" data-bs-target="#createOneOffModal">+ Новая разовая</button>
     </div>
 </div>
 
@@ -152,4 +152,126 @@
     </div>
 </div>
 {% endfor %}
+
+<!-- Модалка создания разовой реализации -->
+<div class="modal fade" id="createOneOffModal" tabindex="-1" aria-labelledby="createOneOffLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" name="form_type" value="create_one_off">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createOneOffLabel">Новая разовая реализация</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Дата <span class="text-danger">*</span></label>
+                            <input type="date" name="date" class="form-control" value="{{ one_off_form_data.get('date') if one_off_form_data and one_off_form_data.get('date') else now.strftime('%d/%m/%Y') }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Контрагент <span class="text-danger">*</span></label>
+                            <select name="counterparty_id" class="form-select" required>
+                                <option value="">Выберите контрагента</option>
+                                {% for cp in counterparties %}
+                                    <option value="{{ cp.id }}" {% if one_off_form_data and one_off_form_data.get('counterparty_id')|int == cp.id %}selected{% endif %}>{{ cp.brand_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Менеджер <span class="text-danger">*</span></label>
+                            <select name="manager_id" class="form-select" required>
+                                <option value="">Выберите менеджера</option>
+                                {% for manager in managers %}
+                                    <option value="{{ manager.id }}" {% if one_off_form_data and one_off_form_data.get('manager_id')|int == manager.id %}selected{% endif %}>{{ manager.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Договор</label>
+                            <select name="contract_id" class="form-select">
+                                <option value="">Без договора</option>
+                                {% for contract in contracts %}
+                                    <option value="{{ contract.id }}" {% if one_off_form_data and one_off_form_data.get('contract_id')|int == contract.id %}selected{% endif %}>{{ contract.number }} ({{ contract.counterparty.brand_name }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Спецификация</label>
+                            <select name="specification_id" class="form-select">
+                                <option value="">Без спецификации</option>
+                                {% for spec in specifications %}
+                                    <option value="{{ spec.id }}" {% if one_off_form_data and one_off_form_data.get('specification_id')|int == spec.id %}selected{% endif %}>{{ spec.number }} ({{ spec.contract.number }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Тип оплаты <span class="text-danger">*</span></label>
+                            <select name="payment_type" class="form-select" required>
+                                <option value="">Выберите тип оплаты</option>
+                                {% for pt in payment_types %}
+                                    <option value="{{ pt.name }}" {% if one_off_form_data and one_off_form_data.get('payment_type') == pt.name %}selected{% elif not one_off_form_data and pt == payment_types[0] %}selected{% endif %}>{{ pt.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Статус оплаты</label>
+                            <select name="payment_status" class="form-select">
+                                {% for ps in payment_statuses %}
+                                    <option value="{{ ps.name }}" {% if one_off_form_data and one_off_form_data.get('payment_status') == ps.name %}selected{% elif not one_off_form_data and ps.name == 'NOT_PAID' %}selected{% endif %}>{{ ps.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Тип услуги <span class="text-danger">*</span></label>
+                            <select name="service_type_id" class="form-select" required>
+                                <option value="">Выберите услугу</option>
+                                {% for st in service_types %}
+                                    <option value="{{ st.id }}" {% if one_off_form_data and one_off_form_data.get('service_type_id')|int == st.id %}selected{% endif %}>{{ st.name.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Объект</label>
+                            <select name="property_object_id" class="form-select">
+                                <option value="">Без объекта</option>
+                                {% for po in property_objects %}
+                                    <option value="{{ po.id }}" {% if one_off_form_data and one_off_form_data.get('property_object_id')|int == po.id %}selected{% endif %}>{{ po.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Описание</label>
+                            <input type="text" name="description" class="form-control" value="{{ one_off_form_data.get('description') if one_off_form_data else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Сумма продажи <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0" name="sale_amount" class="form-control" value="{{ one_off_form_data.get('sale_amount') if one_off_form_data else '' }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Расходы</label>
+                            <input type="number" step="0.01" min="0" name="expense_amount" class="form-control" value="{{ one_off_form_data.get('expense_amount') if one_off_form_data else '' }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if one_off_form_data %}
+            var createModal = new bootstrap.Modal(document.getElementById('createOneOffModal'));
+            createModal.show();
+        {% endif %}
+    });
+</script>
 {% endblock %}
