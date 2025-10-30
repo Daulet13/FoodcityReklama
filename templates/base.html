@@ -13,6 +13,41 @@
         .container {
             max-width: 1200px;
         }
+        .table-hover tbody tr {
+            transition: all 0.2s ease;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: translateX(2px);
+            box-shadow: inset 4px 0 0 0 #0d6efd;
+        }
+        .card {
+            border-radius: 12px;
+        }
+        .table {
+            font-size: 0.9rem;
+        }
+        .table th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+            border-bottom: 2px solid #e9ecef;
+            padding: 0.875rem 0.75rem;
+        }
+        .table td {
+            padding: 1rem 0.75rem;
+            vertical-align: middle;
+        }
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+        }
+        .badge {
+            font-weight: 500;
+            font-size: 0.7rem;
+        }
     </style>
     {% block styles %}{% endblock %}
 </head>

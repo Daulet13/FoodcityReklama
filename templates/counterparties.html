@@ -3,145 +3,170 @@
 {% block title %}Контрагенты{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Контрагенты</h1>
-
-    <div class="card mb-4">
-        <div class="card-header">
-            Добавить нового контрагента
-        </div>
-        <div class="card-body">
-            <form method="post">
-                <input type="hidden" name="form_type" value="create">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label for="brand_name" class="form-label">Бренд</label>
-                        <input type="text" class="form-control" id="brand_name" name="brand_name" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="type" class="form-label">Тип организации</label>
-                        <select class="form-select" id="type" name="type" required>
-                            {% for type in types %}
-                            <option value="{{ type.name }}">{{ type.value }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-12">
-                        <label for="full_name" class="form-label">Полное название</label>
-                        <input type="text" class="form-control" id="full_name" name="full_name" required>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary">Добавить</button>
-                    </div>
-                </div>
-            </form>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1 fw-bold">Контрагенты</h1>
+        <p class="text-muted small mb-0">Управление контрагентами</p>
     </div>
+    <button class="btn btn-success btn-sm shadow-sm" data-bs-toggle="collapse" data-bs-target="#addForm" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+        </svg>
+        Добавить контрагента
+    </button>
+</div>
 
-    <div class="card">
-        <div class="card-header">
-            Список контрагентов
-        </div>
-        <div class="card-body">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Бренд</th>
-                        <th>Полное название</th>
-                        <th>Тип</th>
-                        <th class="text-end">Действия</th>
-                    </tr>
-                </thead>
+<div class="card shadow-sm border-0 mb-4 collapse" id="addForm">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Добавить нового контрагента</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            <input type="hidden" name="form_type" value="create">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="brand_name" class="form-label">Бренд</label>
+                    <input type="text" class="form-control shadow-sm border-0" id="brand_name" name="brand_name" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="type" class="form-label">Тип организации</label>
+                    <select class="form-select shadow-sm border-0" id="type" name="type" required>
+                        {% for type in types %}
+                        <option value="{{ type.name }}">{{ type.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label for="full_name" class="form-label">Полное название</label>
+                    <input type="text" class="form-control shadow-sm border-0" id="full_name" name="full_name" required>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary shadow-sm">Добавить</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Список контрагентов</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle" style="width: 100%; table-layout: auto;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">Бренд</th>
+                    <th>Полное название</th>
+                    <th>Тип</th>
+                    <th class="text-center pe-4">Действия</th>
+                </tr>
+            </thead>
                 <tbody>
                     {% for cp in counterparties %}
-                    <tr>
-                        <td>{{ cp.brand_name }}</td>
-                        <td>{{ cp.full_name }}</td>
-                        <td>{{ cp.type.value }}</td>
-                        <td class="text-end">
+                    <tr class="border-start border-0">
+                        <td class="ps-4">
+                            <span class="fw-medium">{{ cp.brand_name }}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted">{{ cp.full_name }}</span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border-0 px-2 py-1">{{ cp.type.value }}</span>
+                        </td>
+                        <td class="text-center pe-4">
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCounterpartyModal{{ cp.id }}">
-                                    Изменить
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCounterpartyModal{{ cp.id }}" title="Изменить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.293a.5.5 0 0 1-.353-.146l-.854-.854A1.5 1.5 0 0 1 0 8.207V1.5C0 .567.567 0 1.5 0h8.586a1.5 1.5 0 0 1 1.06.44l4.853 4.853a1.5 1.5 0 0 1 .44 1.06V8.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5V8z"/>
+                                    </svg>
                                 </button>
-                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCounterpartyModal{{ cp.id }}">
-                                    Удалить
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCounterpartyModal{{ cp.id }}" title="Удалить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
                                 </button>
                             </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center">Контрагентов пока нет</td>
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <p class="mb-0">Контрагентов пока нет</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
     </div>
+</div>
 
-    {% for cp in counterparties %}
-    <!-- Модалка редактирования -->
-    <div class="modal fade" id="editCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="editCounterpartyLabel{{ cp.id }}" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="post">
-                    <input type="hidden" name="form_type" value="update">
-                    <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="editCounterpartyLabel{{ cp.id }}">Редактировать контрагента</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+{% for cp in counterparties %}
+<!-- Модалка редактирования -->
+<div class="modal fade" id="editCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="editCounterpartyLabel{{ cp.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" name="form_type" value="update">
+                <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editCounterpartyLabel{{ cp.id }}">Редактировать контрагента</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="brand_name_{{ cp.id }}" class="form-label">Бренд</label>
+                        <input type="text" class="form-control" id="brand_name_{{ cp.id }}" name="brand_name" value="{{ cp.brand_name }}" required>
                     </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="brand_name_{{ cp.id }}" class="form-label">Бренд</label>
-                            <input type="text" class="form-control" id="brand_name_{{ cp.id }}" name="brand_name" value="{{ cp.brand_name }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="full_name_{{ cp.id }}" class="form-label">Полное название</label>
-                            <input type="text" class="form-control" id="full_name_{{ cp.id }}" name="full_name" value="{{ cp.full_name }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="type_{{ cp.id }}" class="form-label">Тип организации</label>
-                            <select class="form-select" id="type_{{ cp.id }}" name="type" required>
-                                {% for type in types %}
-                                <option value="{{ type.name }}" {% if type == cp.type %}selected{% endif %}>{{ type.value }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label for="full_name_{{ cp.id }}" class="form-label">Полное название</label>
+                        <input type="text" class="form-control" id="full_name_{{ cp.id }}" name="full_name" value="{{ cp.full_name }}" required>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <div class="mb-3">
+                        <label for="type_{{ cp.id }}" class="form-label">Тип организации</label>
+                        <select class="form-select" id="type_{{ cp.id }}" name="type" required>
+                            {% for type in types %}
+                            <option value="{{ type.name }}" {% if type == cp.type %}selected{% endif %}>{{ type.value }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                </form>
-            </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
-    <!-- Модалка удаления -->
-    <div class="modal fade" id="deleteCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="deleteCounterpartyLabel{{ cp.id }}" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="post">
-                    <input type="hidden" name="form_type" value="delete">
-                    <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="deleteCounterpartyLabel{{ cp.id }}">Удалить контрагента</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<!-- Модалка удаления -->
+<div class="modal fade" id="deleteCounterpartyModal{{ cp.id }}" tabindex="-1" aria-labelledby="deleteCounterpartyLabel{{ cp.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" name="form_type" value="delete">
+                <input type="hidden" name="counterparty_id" value="{{ cp.id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteCounterpartyLabel{{ cp.id }}">Удалить контрагента</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Вы уверены, что хотите удалить контрагента <strong>{{ cp.brand_name }}</strong>?</p>
+                    {% if cp.contracts %}
+                    <div class="alert alert-warning" role="alert">
+                        Невозможно удалить: есть связанные договоры ({{ cp.contracts|length }}).
                     </div>
-                    <div class="modal-body">
-                        <p class="mb-2">Вы уверены, что хотите удалить контрагента <strong>{{ cp.brand_name }}</strong>?</p>
-                        {% if cp.contracts %}
-                        <div class="alert alert-warning" role="alert">
-                            Невозможно удалить: есть связанные договоры ({{ cp.contracts|length }}).
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-danger" {% if cp.contracts %}disabled{% endif %}>Удалить</button>
-                    </div>
-                </form>
-            </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger" {% if cp.contracts %}disabled{% endif %}>Удалить</button>
+                </div>
+            </form>
         </div>
     </div>
-    {% endfor %}
+</div>
+{% endfor %}
 {% endblock %}
+

@@ -44,24 +44,23 @@
         <h5 class="mb-0 fw-semibold">Список всех реализаций</h5>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th class="ps-4" style="width: 80px;">№</th>
-                        <th style="width: 100px;">Дата</th>
-                        <th style="min-width: 150px;">Контрагент</th>
-                        <th style="min-width: 120px;">Услуга</th>
-                        <th style="min-width: 120px;">Объект</th>
-                        <th style="min-width: 140px;">Договор</th>
-                        <th style="width: 80px;" class="text-center">Источник</th>
-                        <th style="width: 100px;" class="text-end">Сумма</th>
-                        <th style="width: 100px;" class="text-end">Расходы</th>
-                        <th style="width: 110px;" class="text-end">Прибыль</th>
-                        <th style="width: 120px;" class="text-center">Статус</th>
-                        <th style="width: 120px;" class="text-center pe-4">Действия</th>
-                    </tr>
-                </thead>
+        <table class="table table-hover mb-0 align-middle" style="width: 100%; table-layout: auto;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">№</th>
+                    <th>Дата</th>
+                    <th>Контрагент</th>
+                    <th>Услуга</th>
+                    <th>Объект</th>
+                    <th>Договор</th>
+                    <th class="text-center">Источник</th>
+                    <th class="text-end">Сумма</th>
+                    <th class="text-end">Расходы</th>
+                    <th class="text-end">Прибыль</th>
+                    <th class="text-center">Статус</th>
+                    <th class="text-center pe-4">Действия</th>
+                </tr>
+            </thead>
                 <tbody>
                     {% for r in realizations %}
                     <tr class="border-start border-0">
@@ -126,7 +125,6 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div>
     </div>
 </div>
 
@@ -395,46 +393,6 @@
 </div>
 {% endblock %}
 
-{% block styles %}
-{{ super() }}
-<style>
-    .table-hover tbody tr {
-        transition: all 0.2s ease;
-    }
-    .table-hover tbody tr:hover {
-        background-color: #f8f9fa;
-        transform: translateX(2px);
-        box-shadow: inset 4px 0 0 0 #0d6efd;
-    }
-    .card {
-        border-radius: 12px;
-    }
-    .table {
-        font-size: 0.9rem;
-    }
-    .table th {
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.5px;
-        color: #6c757d;
-        border-bottom: 2px solid #e9ecef;
-        padding: 0.875rem 0.75rem;
-    }
-    .table td {
-        padding: 1rem 0.75rem;
-        vertical-align: middle;
-    }
-    .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        border-radius: 6px;
-    }
-    .badge {
-        font-weight: 500;
-        font-size: 0.7rem;
-    }
-</style>
-{% endblock %}
 
 {% block scripts %}
 {{ super() }}

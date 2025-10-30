@@ -3,11 +3,22 @@
 {% block title %}Договоры{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">Договоры</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1 fw-bold">Договоры</h1>
+        <p class="text-muted small mb-0">Управление договорами</p>
+    </div>
+    <button class="btn btn-success btn-sm shadow-sm" data-bs-toggle="collapse" data-bs-target="#addForm" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+        </svg>
+        Добавить договор
+    </button>
+</div>
 
-<div class="card mb-4">
-    <div class="card-header">
-        Добавить новый договор
+<div class="card shadow-sm border-0 mb-4 collapse" id="addForm">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Добавить новый договор</h5>
     </div>
     <div class="card-body">
         <form method="post">
@@ -15,20 +26,20 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <label for="number" class="form-label">Номер договора</label>
-                    <input type="text" class="form-control" id="number" name="number" required>
+                    <input type="text" class="form-control shadow-sm border-0" id="number" name="number" required>
                 </div>
                 <div class="col-md-4">
                     <label for="date" class="form-label">Дата договора</label>
-                    <input type="text" class="form-control js-date" id="date" name="date" required>
+                    <input type="text" class="form-control js-date shadow-sm border-0" id="date" name="date" required>
                 </div>
                 <div class="col-md-4">
                     <label for="app_end_date" class="form-label">Дата окончания АПП</label>
-                    <input type="text" class="form-control js-date" id="app_end_date" name="app_end_date">
+                    <input type="text" class="form-control js-date shadow-sm border-0" id="app_end_date" name="app_end_date">
                 </div>
 
                 <div class="col-md-6">
                     <label for="counterparty_id" class="form-label">Контрагент</label>
-                    <select class="form-select" id="counterparty_id" name="counterparty_id" required>
+                    <select class="form-select shadow-sm border-0" id="counterparty_id" name="counterparty_id" required>
                         <option selected disabled value="">Выберите...</option>
                         {% for cp in counterparties %}
                         <option value="{{ cp.id }}">{{ cp.brand_name }}</option>
@@ -37,7 +48,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="manager_id" class="form-label">Ответственный менеджер</label>
-                    <select class="form-select" id="manager_id" name="manager_id" required>
+                    <select class="form-select shadow-sm border-0" id="manager_id" name="manager_id" required>
                          <option selected disabled value="">Выберите...</option>
                         {% for manager in managers %}
                         <option value="{{ manager.id }}">{{ manager.name }}</option>
@@ -47,7 +58,7 @@
 
                 <div class="col-md-4">
                     <label for="category_id" class="form-label">Категория бизнеса</label>
-                     <select class="form-select" id="category_id" name="category_id" required>
+                     <select class="form-select shadow-sm border-0" id="category_id" name="category_id" required>
                          <option selected disabled value="">Выберите...</option>
                         {% for category in categories %}
                         <option value="{{ category.id }}">{{ category.name.value }}</option>
@@ -56,11 +67,11 @@
                 </div>
                 <div class="col-md-4">
                     <label for="pavilion_number" class="form-label">Номер павильона</label>
-                    <input type="text" class="form-control" id="pavilion_number" name="pavilion_number">
+                    <input type="text" class="form-control shadow-sm border-0" id="pavilion_number" name="pavilion_number">
                 </div>
                 <div class="col-md-4">
                     <label for="status" class="form-label">Статус</label>
-                     <select class="form-select" id="status" name="status" required>
+                     <select class="form-select shadow-sm border-0" id="status" name="status" required>
                         {% for status in statuses %}
                         <option value="{{ status.name }}">{{ status.value }}</option>
                         {% endfor %}
@@ -68,55 +79,70 @@
                 </div>
                 
                 <div class="col-12">
-                    <button type="submit" class="btn btn-primary">Добавить договор</button>
+                    <button type="submit" class="btn btn-primary shadow-sm">Добавить договор</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        Список договоров
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Список договоров</h5>
     </div>
-    <div class="card-body">
-        <table class="table table-striped">
-            <thead>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle" style="width: 100%; table-layout: auto;">
+            <thead class="table-light">
                 <tr>
-                    <th>Номер</th>
+                    <th class="ps-4">Номер</th>
                     <th>Дата</th>
                     <th>Контрагент</th>
                     <th>Менеджер</th>
                     <th>Статус</th>
-                    <th class="text-end">Действия</th>
+                    <th class="text-center pe-4">Действия</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for contract in contracts %}
-                <tr>
-                    <td><a href="{{ url_for('contract_detail', contract_id=contract.id) }}">{{ contract.number }}</a></td>
-                    <td>{{ contract.date.strftime('%d/%m/%Y') }}</td>
-                    <td>{{ contract.counterparty.brand_name }}</td>
-                    <td>{{ contract.manager.name }}</td>
-                    <td>{{ contract.status.value }}</td>
-                    <td class="text-end">
-                        <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editContractModal{{ contract.id }}">
-                                Изменить
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteContractModal{{ contract.id }}">
-                                Удалить
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="text-center">Договоров пока нет</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                <tbody>
+                    {% for contract in contracts %}
+                    <tr class="border-start border-0">
+                        <td class="ps-4">
+                            <a href="{{ url_for('contract_detail', contract_id=contract.id) }}" class="text-decoration-none fw-medium text-primary">{{ contract.number }}</a>
+                        </td>
+                        <td>{{ contract.date.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <span class="fw-medium">{{ contract.counterparty.brand_name }}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted">{{ contract.manager.name }}</span>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill bg-info bg-opacity-10 text-info border-0 px-2 py-1">{{ contract.status.value }}</span>
+                        </td>
+                        <td class="text-center pe-4">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editContractModal{{ contract.id }}" title="Изменить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.293a.5.5 0 0 1-.353-.146l-.854-.854A1.5 1.5 0 0 1 0 8.207V1.5C0 .567.567 0 1.5 0h8.586a1.5 1.5 0 0 1 1.06.44l4.853 4.853a1.5 1.5 0 0 1 .44 1.06V8.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5V8z"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteContractModal{{ contract.id }}" title="Удалить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <p class="mb-0">Договоров пока нет</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
     </div>
 </div>
 
