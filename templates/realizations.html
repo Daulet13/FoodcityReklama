@@ -4,13 +4,27 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Реализации</h1>
-    <div class="d-flex align-items-center gap-2">
+    <div>
+        <h1 class="mb-1 fw-bold">Реализации</h1>
+        <p class="text-muted small mb-0">Управление реализациями и начислениями</p>
+    </div>
+    <div class="d-flex align-items-center gap-3">
         <form action="{{ url_for('generate_realizations') }}" method="post" class="d-flex align-items-center gap-2">
-            <input type="month" name="month" class="form-control" value="{{ now.strftime('%Y-%m') }}">
-            <button type="submit" class="btn btn-primary text-nowrap">Сформировать за месяц</button>
+            <input type="month" name="month" class="form-control form-control-sm shadow-sm border-0" style="width: 160px;" value="{{ now.strftime('%Y-%m') }}">
+            <button type="submit" class="btn btn-primary btn-sm shadow-sm text-nowrap">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="M7.646 10.854a.5.5 0 0 0 .708 0l2.5-2.5a.5.5 0 0 0-.708-.708L8 10.293 5.854 8.146a.5.5 0 1 0-.708.708l2.5 2.5z"/>
+                </svg>
+                Сформировать за месяц
+            </button>
         </form>
-        <button class="btn btn-secondary text-nowrap" data-bs-toggle="modal" data-bs-target="#createOneOffModal">+ Новая разовая</button>
+        <button class="btn btn-success btn-sm shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#createOneOffModal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
+            Новая разовая
+        </button>
     </div>
 </div>
 
@@ -25,68 +39,94 @@
     {% endif %}
 {% endwith %}
 
-<div class="card">
-    <div class="card-header">
-        Список всех реализаций
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Список всех реализаций</h5>
     </div>
-    <div class="card-body">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Номер</th>
-                    <th>Дата</th>
-                    <th>Контрагент</th>
-                    <th>Тип услуги</th>
-                    <th>Объект</th>
-                    <th>Договор/Спец</th>
-                    <th>Источник</th>
-                    <th>Сумма</th>
-                    <th>Расходы</th>
-                    <th>Прибыль</th>
-                    <th>Статус оплаты</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in realizations %}
-                <tr>
-                    <td><a href="#" class="text-decoration-none">{{ r.number }}</a></td>
-                    <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
-                    <td>{{ r.counterparty.brand_name }}</td>
-                    <td>{{ r.services[0].service_type.name.value if r.services else '—' }}</td>
-                    <td>{{ r.services[0].property_object.name if r.services and r.services[0].property_object else '—' }}</td>
-                    <td>
-                        {% if r.specification %}
-                            <a href="{{ url_for('contract_detail', contract_id=r.contract_id) }}" class="text-decoration-none">{{ r.contract.number }}</a> / {{ r.specification.number }}
-                        {% elif r.contract %}
-                            <a href="{{ url_for('contract_detail', contract_id=r.contract_id) }}" class="text-decoration-none">{{ r.contract.number }}</a>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if r.source.name == 'AUTO' %}
-                            <span class="badge bg-info">Авто</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Разовая</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">{{ "%.2f"|format(r.total_sale) }}</td>
-                    <td class="text-end">{{ "%.2f"|format(r.total_expense) }}</td>
-                    <td class="text-end fw-bold">{{ "%.2f"|format(r.total_profit) }}</td>
-                    <td><span class="badge bg-warning text-dark">{{ r.payment_status.value }}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editRealizationModal{{ r.id }}">Изменить</button>
-                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteRealizationModal{{ r.id }}">Удалить</button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="12" class="text-center">Реализаций пока нет.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4" style="width: 80px;">№</th>
+                        <th style="width: 100px;">Дата</th>
+                        <th style="min-width: 150px;">Контрагент</th>
+                        <th style="min-width: 120px;">Услуга</th>
+                        <th style="min-width: 120px;">Объект</th>
+                        <th style="min-width: 140px;">Договор</th>
+                        <th style="width: 80px;" class="text-center">Источник</th>
+                        <th style="width: 100px;" class="text-end">Сумма</th>
+                        <th style="width: 100px;" class="text-end">Расходы</th>
+                        <th style="width: 110px;" class="text-end">Прибыль</th>
+                        <th style="width: 120px;" class="text-center">Статус</th>
+                        <th style="width: 120px;" class="text-center pe-4">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in realizations %}
+                    <tr class="border-start border-0">
+                        <td class="ps-4">
+                            <span class="text-muted small">{{ r.number[:8] }}...</span>
+                        </td>
+                        <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <span class="fw-medium">{{ r.counterparty.brand_name }}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted small">{{ r.services[0].service_type.name.value if r.services else '—' }}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted small">{{ r.services[0].property_object.name if r.services and r.services[0].property_object else '—' }}</span>
+                        </td>
+                        <td>
+                            {% if r.specification %}
+                                <a href="{{ url_for('contract_detail', contract_id=r.contract_id) }}" class="text-decoration-none text-primary small">{{ r.contract.number }}</a>
+                                <span class="text-muted small">/ {{ r.specification.number }}</span>
+                            {% elif r.contract %}
+                                <a href="{{ url_for('contract_detail', contract_id=r.contract_id) }}" class="text-decoration-none text-primary small">{{ r.contract.number }}</a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if r.source.name == 'AUTO' %}
+                                <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border-0 px-2 py-1">Авто</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border-0 px-2 py-1">Ручная</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-medium">{{ "%.2f"|format(r.total_sale) }}</td>
+                        <td class="text-end text-muted">{{ "%.2f"|format(r.total_expense) }}</td>
+                        <td class="text-end fw-bold text-success">{{ "%.2f"|format(r.total_profit) }}</td>
+                        <td class="text-center">
+                            <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning-emphasis border-0 px-2 py-1">{{ r.payment_status.value }}</span>
+                        </td>
+                        <td class="text-center pe-4">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editRealizationModal{{ r.id }}" title="Изменить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.293a.5.5 0 0 1-.353-.146l-.854-.854A1.5 1.5 0 0 1 0 8.207V1.5C0 .567.567 0 1.5 0h8.586a1.5 1.5 0 0 1 1.06.44l4.853 4.853a1.5 1.5 0 0 1 .44 1.06V8.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5V8z"/>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteRealizationModal{{ r.id }}" title="Удалить">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="12" class="text-center py-5 text-muted">
+                            <p class="mb-0">Реализаций пока нет.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -353,6 +393,47 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .table-hover tbody tr {
+        transition: all 0.2s ease;
+    }
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+        transform: translateX(2px);
+        box-shadow: inset 4px 0 0 0 #0d6efd;
+    }
+    .card {
+        border-radius: 12px;
+    }
+    .table {
+        font-size: 0.9rem;
+    }
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        border-bottom: 2px solid #e9ecef;
+        padding: 0.875rem 0.75rem;
+    }
+    .table td {
+        padding: 1rem 0.75rem;
+        vertical-align: middle;
+    }
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+    }
+    .badge {
+        font-weight: 500;
+        font-size: 0.7rem;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
