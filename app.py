@@ -406,8 +406,27 @@ def realizations_list():
             realization.date = parse_date(request.form['date'])
             realization.month = realization.date.month
             realization.year = realization.date.year
-            realization.payment_type = PaymentType[request.form['payment_type']]
-            realization.payment_status = PaymentStatus[request.form['payment_status']]
+            
+            # Для MANUAL реализаций разрешаем редактировать все поля
+            if realization.source == RealizationSource.MANUAL:
+                realization.counterparty_id = int(request.form['counterparty_id'])
+                realization.contract_id = int(request.form['contract_id']) if request.form.get('contract_id') else None
+                realization.specification_id = int(request.form['specification_id']) if request.form.get('specification_id') else None
+                realization.manager_id = int(request.form['manager_id'])
+                
+                # Обновляем услугу
+                if realization.services:
+                    service = realization.services[0]
+                    service.service_type_id = int(request.form['service_type_id'])
+                    service.property_object_id = int(request.form['property_object_id']) if request.form.get('property_object_id') else None
+                    service.sale_amount = Decimal(request.form['sale_amount'].replace(',', '.'))
+            
+            # Для всех реализаций (AUTO и MANUAL) разрешаем редактировать описание и расходы
+            if realization.services:
+                service = realization.services[0]
+                service.description = request.form.get('description')
+                service.expense_amount = Decimal(request.form.get('expense_amount', '0').replace(',', '.'))
+            
             db.session.commit()
             flash('Реализация обновлена.', 'success')
             return redirect(url_for('realizations_list'))
@@ -497,19 +516,7 @@ def realizations_list():
                 flash('Укажите менеджера.', 'danger')
                 has_error = True
 
-            payment_type_name = form.get('payment_type')
-            payment_status_name = form.get('payment_status', PaymentStatus.NOT_PAID.name)
-            try:
-                payment_type = PaymentType[payment_type_name]
-            except KeyError:
-                payment_type = None
-                flash('Выберите корректный тип оплаты.', 'danger')
-                has_error = True
-
-            try:
-                payment_status = PaymentStatus[payment_status_name]
-            except KeyError:
-                payment_status = PaymentStatus.NOT_PAID
+            # payment_status всегда NOT_PAID для новой реализации (в будущем будет автоматически из платежей)
 
             service_type_id = form.get('service_type_id')
             service_type = None
@@ -566,12 +573,10 @@ def realizations_list():
                     has_error = True
                     expense_amount = Decimal('0')
 
-            if has_error or not all([realization_date, counterparty_id, manager, payment_type, service_type, sale_amount]):
+            if has_error or not all([realization_date, counterparty_id, manager, service_type, sale_amount]):
                 return render_template(
                     'realizations.html',
                     realizations=Realization.query.order_by(Realization.date.desc()).all(),
-                    payment_types=list(PaymentType),
-                    payment_statuses=list(PaymentStatus),
                     counterparties=Counterparty.query.order_by(Counterparty.brand_name).all(),
                     contracts=Contract.query.order_by(Contract.number).all(),
                     specifications=Specification.query.order_by(Specification.number).all(),
@@ -587,8 +592,7 @@ def realizations_list():
                 month=realization_date.month,
                 year=realization_date.year,
                 source=RealizationSource.MANUAL,
-                payment_type=payment_type,
-                payment_status=payment_status,
+                payment_status=PaymentStatus.NOT_PAID,
                 counterparty_id=counterparty_id,
                 contract_id=contract.id if contract else None,
                 specification_id=specification.id if specification else None,
@@ -611,8 +615,6 @@ def realizations_list():
             return redirect(url_for('realizations_list'))
 
     realizations = Realization.query.order_by(Realization.date.desc()).all()
-    payment_types = list(PaymentType)
-    payment_statuses = list(PaymentStatus)
     counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
     contracts = Contract.query.order_by(Contract.number).all()
     specifications = Specification.query.order_by(Specification.number).all()
@@ -622,8 +624,6 @@ def realizations_list():
 
     return render_template('realizations.html', 
                           realizations=realizations, 
-                          payment_types=payment_types,
-                          payment_statuses=payment_statuses,
                           counterparties=counterparties,
                           contracts=contracts,
                           specifications=specifications,
@@ -681,7 +681,7 @@ def generate_realizations():
                         source=RealizationSource.AUTO,
                         month=month,
                         year=year,
-                        payment_type=PaymentType.NON_CASH,
+                        payment_status=PaymentStatus.NOT_PAID,
                         counterparty_id=contract.counterparty_id,
                         contract_id=contract.id,
                         specification_id=spec.id,

@@ -181,7 +181,6 @@ class Realization(db.Model):
     source = db.Column(db.Enum(RealizationSource), nullable=False)
     month = db.Column(db.Integer) # Месяц реализации (1-12)
     year = db.Column(db.Integer) # Год реализации
-    payment_type = db.Column(db.Enum(PaymentType), nullable=False)
     payment_status = db.Column(db.Enum(PaymentStatus), default=PaymentStatus.NOT_PAID, nullable=False)
 
     counterparty_id = db.Column(db.Integer, db.ForeignKey('counterparty.id'), nullable=False)
