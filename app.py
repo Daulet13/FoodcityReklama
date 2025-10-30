@@ -15,7 +15,8 @@ from models import (db, User, Counterparty, CounterpartyType, Role,
                     PropertyObject, PropertyObjectType, ServiceType, BusinessCategory,
                     PropertyObjectTypeEnum, ServiceTypeEnum, BusinessCategoryEnum,
                     Contract, ContractStatus, Specification, SpecificationService, BillingType,
-                    Realization, RealizationService, RealizationSource, PaymentType, PaymentStatus)
+                    Realization, RealizationService, RealizationSource, PaymentType, PaymentStatus,
+                    Payment, payment_realization_association)
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -707,6 +708,273 @@ def generate_realizations():
         flash(f'Новых реализаций для генерации за {month:02}.{year} не найдено.', 'info')
 
     return redirect(url_for('realizations_list'))
+
+
+@app.route('/payments', methods=['GET', 'POST'])
+def payments_list():
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+        
+        if form_type == 'create_payment':
+            form = request.form
+            has_error = False
+            
+            try:
+                payment_date = parse_date(form['date'])
+            except (ValueError, KeyError):
+                flash('Неверный формат даты.', 'danger')
+                has_error = True
+                payment_date = None
+            
+            counterparty_id_raw = form.get('counterparty_id')
+            counterparty_id = None
+            if not counterparty_id_raw:
+                flash('Укажите контрагента.', 'danger')
+                has_error = True
+            else:
+                try:
+                    counterparty_id = int(counterparty_id_raw)
+                    counterparty = Counterparty.query.get(counterparty_id)
+                    if not counterparty:
+                        flash('Выбранный контрагент не найден.', 'danger')
+                        has_error = True
+                except ValueError:
+                    flash('Указан некорректный контрагент.', 'danger')
+                    has_error = True
+            
+            contract_id = None
+            contract_id_raw = form.get('contract_id')
+            if contract_id_raw:
+                try:
+                    contract_id_val = int(contract_id_raw)
+                    contract = Contract.query.get(contract_id_val)
+                    if not contract:
+                        flash('Выбранный договор не найден.', 'danger')
+                        has_error = True
+                    elif counterparty_id and contract.counterparty_id != counterparty_id:
+                        flash('Договор не принадлежит выбранному контрагенту.', 'danger')
+                        has_error = True
+                    else:
+                        contract_id = contract_id_val
+                except ValueError:
+                    flash('Указан некорректный договор.', 'danger')
+                    has_error = True
+            
+            try:
+                payment_type = PaymentType[form['payment_type']]
+            except KeyError:
+                payment_type = None
+                flash('Выберите корректный тип оплаты.', 'danger')
+                has_error = True
+            
+            amount = None
+            try:
+                amount = Decimal(form.get('amount', '0').replace(',', '.'))
+                if amount <= 0:
+                    flash('Сумма платежа должна быть больше нуля.', 'danger')
+                    has_error = True
+                    amount = None
+            except (InvalidOperation, AttributeError):
+                flash('Укажите корректную сумму платежа.', 'danger')
+                has_error = True
+            
+            selected_realizations_ids = form.getlist('realization_ids')
+            selected_realizations = []
+            if selected_realizations_ids:
+                for realization_id_raw in selected_realizations_ids:
+                    try:
+                        realization_id = int(realization_id_raw)
+                        realization = Realization.query.get(realization_id)
+                    except ValueError:
+                        realization = None
+                    if not realization:
+                        flash('Выбрана некорректная реализация.', 'danger')
+                        has_error = True
+                        break
+                    if counterparty_id and realization.counterparty_id != counterparty_id:
+                        flash('Выбранная реализация не принадлежит контрагенту платежа.', 'danger')
+                        has_error = True
+                        break
+                    if realization.debt_amount <= 0:
+                        continue
+                    selected_realizations.append(realization)
+            
+            if has_error or not all([payment_date, counterparty_id, payment_type, amount]):
+                return redirect(url_for('payments_list'))
+            
+            # Создаем платеж
+            payment = Payment(
+                date=payment_date,
+                initial_amount=amount,
+                unallocated_amount=amount,
+                payment_type=payment_type,
+                counterparty_id=counterparty_id,
+                contract_id=contract_id
+            )
+            
+            db.session.add(payment)
+            db.session.flush()  # Получаем ID платежа
+            
+            total_allocated = Decimal('0')
+            for realization in selected_realizations:
+                if total_allocated >= amount:
+                    break
+                debt = realization.debt_amount
+                if debt <= 0:
+                    continue
+                allocation_amount = min(debt, amount - total_allocated)
+                if allocation_amount <= 0:
+                    continue
+                db.session.execute(payment_realization_association.insert().values(
+                    payment_id=payment.id,
+                    realization_id=realization.id,
+                    amount=allocation_amount
+                ))
+                realization.paid_amount = Decimal(str(realization.paid_amount)) + allocation_amount
+                realization.update_payment_status()
+                total_allocated += allocation_amount
+            
+            payment.unallocated_amount = max(Decimal('0'), amount - total_allocated)
+            db.session.commit()
+            
+            if total_allocated > 0:
+                if payment.unallocated_amount > 0:
+                    flash(f'Платеж создан. На реализации распределено {total_allocated:.2f} руб., аванс {payment.unallocated_amount:.2f} руб.', 'success')
+                else:
+                    flash('Платеж создан и полностью распределён на выбранные реализации.', 'success')
+            else:
+                flash('Платеж создан как аванс. Распределение выполните позже.', 'success')
+            return redirect(url_for('payments_list'))
+    
+    payments = Payment.query.order_by(Payment.date.desc()).all()
+    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
+    contracts = Contract.query.order_by(Contract.number).all()
+
+    # Список неоплаченных реализаций для каждого контрагента
+    eligible_realizations = Realization.query.filter(Realization.payment_status != PaymentStatus.PAID).order_by(Realization.date.asc()).all()
+    realizations_by_counterparty = {}
+    for realization in eligible_realizations:
+        debt = realization.debt_amount
+        if debt <= 0:
+            continue
+        realizations_by_counterparty.setdefault(realization.counterparty_id, []).append(realization)
+
+    realizations_payload = {}
+    for counterparty_id, items in realizations_by_counterparty.items():
+        realizations_payload[counterparty_id] = [
+            {
+                'id': item.id,
+                'number': item.number,
+                'date': item.date.strftime('%d/%m/%Y'),
+                'contract_number': item.contract.number if item.contract else None,
+                'specification_number': item.specification.number if item.specification else None,
+                'total': float(item.total_sale),
+                'paid': float(item.paid_amount or 0),
+                'debt': float(item.debt_amount)
+            }
+            for item in items
+        ]
+    
+    return render_template('payments.html',
+                          payments=payments,
+                          counterparties=counterparties,
+                          contracts=contracts,
+                          payment_types=list(PaymentType),
+                          realizations_json=realizations_payload,
+                          now=datetime.now())
+
+@app.route('/update-payment/<int:payment_id>', methods=['POST'])
+def update_payment(payment_id):
+    payment = Payment.query.get_or_404(payment_id)
+    form = request.form
+    
+    try:
+        payment_date = parse_date(form['date'])
+    except (ValueError, KeyError):
+        flash('Неверный формат даты.', 'danger')
+        return redirect(url_for('payments_list'))
+    
+    counterparty_id_raw = form.get('counterparty_id')
+    counterparty_id = None
+    if not counterparty_id_raw:
+        flash('Укажите контрагента.', 'danger')
+        return redirect(url_for('payments_list'))
+    else:
+        try:
+            counterparty_id = int(counterparty_id_raw)
+            counterparty = Counterparty.query.get(counterparty_id)
+            if not counterparty:
+                flash('Выбранный контрагент не найден.', 'danger')
+                return redirect(url_for('payments_list'))
+        except ValueError:
+            flash('Указан некорректный контрагент.', 'danger')
+            return redirect(url_for('payments_list'))
+    
+    contract_id = None
+    contract_id_raw = form.get('contract_id')
+    if contract_id_raw:
+        try:
+            contract_id_val = int(contract_id_raw)
+            contract = Contract.query.get(contract_id_val)
+            if not contract:
+                flash('Выбранный договор не найден.', 'danger')
+                return redirect(url_for('payments_list'))
+            elif counterparty_id and contract.counterparty_id != counterparty_id:
+                flash('Договор не принадлежит выбранному контрагенту.', 'danger')
+                return redirect(url_for('payments_list'))
+            else:
+                contract_id = contract_id_val
+        except ValueError:
+            flash('Указан некорректный договор.', 'danger')
+            return redirect(url_for('payments_list'))
+    
+    try:
+        payment_type = PaymentType[form['payment_type']]
+    except KeyError:
+        flash('Выберите корректный тип оплаты.', 'danger')
+        return redirect(url_for('payments_list'))
+    
+    # Обновляем только базовые поля (дата, контрагент, договор, тип)
+    # Сумму не трогаем, чтобы не нарушить существующие привязки
+    payment.date = payment_date
+    payment.counterparty_id = counterparty_id
+    payment.contract_id = contract_id
+    payment.payment_type = payment_type
+    
+    db.session.commit()
+    flash('Платеж обновлён.', 'success')
+    return redirect(url_for('payments_list'))
+
+@app.route('/delete-payment/<int:payment_id>', methods=['POST'])
+def delete_payment(payment_id):
+    payment = Payment.query.get_or_404(payment_id)
+    
+    # Проверяем, есть ли привязанные реализации
+    allocated_realizations = db.session.execute(
+        payment_realization_association.select().where(
+            payment_realization_association.c.payment_id == payment_id
+        )
+    ).fetchall()
+    
+    if allocated_realizations:
+        # Откатываем все распределения
+        for row in allocated_realizations:
+            realization = Realization.query.get(row.realization_id)
+            if realization:
+                realization.paid_amount = Decimal(str(realization.paid_amount)) - Decimal(str(row.amount))
+                realization.update_payment_status()
+        
+        # Удаляем записи из таблицы связи
+        db.session.execute(
+            payment_realization_association.delete().where(
+                payment_realization_association.c.payment_id == payment_id
+            )
+        )
+    
+    db.session.delete(payment)
+    db.session.commit()
+    flash('Платеж удалён, распределения откатаны.', 'success')
+    return redirect(url_for('payments_list'))
 
 
 if __name__ == '__main__':

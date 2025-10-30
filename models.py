@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 import enum
 from datetime import datetime
+from decimal import Decimal
 
 db = SQLAlchemy()
 
@@ -182,6 +183,7 @@ class Realization(db.Model):
     month = db.Column(db.Integer) # Месяц реализации (1-12)
     year = db.Column(db.Integer) # Год реализации
     payment_status = db.Column(db.Enum(PaymentStatus), default=PaymentStatus.NOT_PAID, nullable=False)
+    paid_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Сколько уже оплачено по этой реализации
 
     counterparty_id = db.Column(db.Integer, db.ForeignKey('counterparty.id'), nullable=False)
     contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'))
@@ -204,6 +206,23 @@ class Realization(db.Model):
     @property
     def total_profit(self):
         return self.total_sale - self.total_expense
+    
+    @property
+    def debt_amount(self):
+        """Остаток долга по реализации"""
+        return max(Decimal('0'), Decimal(str(self.total_sale)) - Decimal(str(self.paid_amount)))
+    
+    def update_payment_status(self):
+        """Автоматическое обновление статуса оплаты"""
+        total = Decimal(str(self.total_sale))
+        paid = Decimal(str(self.paid_amount))
+        
+        if paid == 0:
+            self.payment_status = PaymentStatus.NOT_PAID
+        elif paid < total:
+            self.payment_status = PaymentStatus.PARTIALLY_PAID
+        else:
+            self.payment_status = PaymentStatus.PAID
 
 class RealizationService(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -218,3 +237,30 @@ class RealizationService(db.Model):
     realization = db.relationship('Realization', backref=db.backref('services', cascade="all, delete-orphan"))
     property_object = db.relationship('PropertyObject')
     service_type = db.relationship('ServiceType')
+
+# Таблица связи "многие-ко-многим" между Payment и Realization
+payment_realization_association = db.Table('payment_realization_association',
+    db.Column('payment_id', db.Integer, db.ForeignKey('payment.id'), primary_key=True),
+    db.Column('realization_id', db.Integer, db.ForeignKey('realization.id'), primary_key=True),
+    db.Column('amount', db.Numeric(10, 2), nullable=False)  # Сколько именно зачтено на эту реализацию
+)
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    initial_amount = db.Column(db.Numeric(10, 2), nullable=False)  # Изначальная сумма платежа
+    unallocated_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Неразнесенный остаток (аванс)
+    payment_type = db.Column(db.Enum(PaymentType), nullable=False)
+    
+    counterparty_id = db.Column(db.Integer, db.ForeignKey('counterparty.id'), nullable=False)
+    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'), nullable=True)
+    
+    counterparty = db.relationship('Counterparty', backref='payments')
+    contract = db.relationship('Contract', backref='payments')
+    realizations = db.relationship('Realization', 
+                                   secondary=payment_realization_association, 
+                                   backref='payments',
+                                   lazy='dynamic')
+    
+    def __repr__(self):
+        return f'<Payment {self.id} {self.date} {self.initial_amount}>'

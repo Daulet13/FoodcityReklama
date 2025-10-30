@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Платежи{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1 fw-bold">Платежи</h1>
+        <p class="text-muted small mb-0">Учет платежей от контрагентов</p>
+    </div>
+    <button class="btn btn-success btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#createPaymentModal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+        </svg>
+        Новый платеж
+    </button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-semibold">Список всех платежей</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle" style="width: 100%; table-layout: auto;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">Дата</th>
+                    <th>Контрагент</th>
+                    <th>Договор</th>
+                    <th class="text-end">Сумма</th>
+                    <th class="text-end">Распределено</th>
+                    <th class="text-end">Аванс</th>
+                    <th class="text-center">Тип оплаты</th>
+                    <th class="text-center pe-4">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr class="border-start border-0">
+                    <td class="ps-4">{{ payment.date.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        <span class="fw-medium">{{ payment.counterparty.brand_name }}</span>
+                    </td>
+                    <td>
+                        {% if payment.contract %}
+                            <a href="{{ url_for('contract_detail', contract_id=payment.contract_id) }}" class="text-decoration-none text-primary small">{{ payment.contract.number }}</a>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-medium">{{ "%.2f"|format(payment.initial_amount) }}</td>
+                    <td class="text-end">
+                        {% set allocated = payment.initial_amount - payment.unallocated_amount %}
+                        <span class="text-muted">{{ "%.2f"|format(allocated) }}</span>
+                    </td>
+                    <td class="text-end">
+                        {% if payment.unallocated_amount > 0 %}
+                            <span class="badge rounded-pill bg-info bg-opacity-10 text-info border-0 px-2 py-1">{{ "%.2f"|format(payment.unallocated_amount) }}</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border-0 px-2 py-1">{{ payment.payment_type.value }}</span>
+                    </td>
+                    <td class="text-center pe-4">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editPaymentModal{{ payment.id }}" title="Изменить">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.293a.5.5 0 0 1-.353-.146l-.854-.854A1.5 1.5 0 0 1 0 8.207V1.5C0 .567.567 0 1.5 0h8.586a1.5 1.5 0 0 1 1.06.44l4.853 4.853a1.5 1.5 0 0 1 .44 1.06V8.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5V8z"/>
+                                </svg>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deletePaymentModal{{ payment.id }}" title="Удалить">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 text-muted">
+                        <p class="mb-0">Платежей пока нет.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модалка создания платежа -->
+<div class="modal fade" id="createPaymentModal" tabindex="-1" aria-labelledby="createPaymentLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" name="form_type" value="create_payment">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createPaymentLabel">Новый платеж</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Дата <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control js-date" name="date" id="payment_date" value="{{ now.strftime('%d/%m/%Y') }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Контрагент <span class="text-danger">*</span></label>
+                            <select name="counterparty_id" class="form-select" id="payment_counterparty" required>
+                                <option value="">Выберите контрагента</option>
+                                {% for cp in counterparties %}
+                                    <option value="{{ cp.id }}">{{ cp.brand_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Договор</label>
+                            <select name="contract_id" class="form-select" id="payment_contract">
+                                <option value="">Без договора</option>
+                                {% for contract in contracts %}
+                                    <option value="{{ contract.id }}" data-counterparty="{{ contract.counterparty_id }}">{{ contract.number }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Сумма <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" name="amount" id="payment_amount" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Тип оплаты <span class="text-danger">*</span></label>
+                            <select name="payment_type" class="form-select" required>
+                                <option value="">Выберите тип</option>
+                                {% for pt in payment_types %}
+                                    <option value="{{ pt.name }}">{{ pt.value }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h6 class="mb-3">Выбор реализаций для оплаты</h6>
+                        <div id="noRealizationsHint" class="alert alert-info small" style="display: none;">
+                            Для выбранного контрагента нет неоплаченных реализаций.
+                        </div>
+                        <div class="table-responsive" id="realizationSelection" style="display: none;">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px;"></th>
+                                        <th>Дата</th>
+                                        <th>Номер</th>
+                                        <th>Договор / Спецификация</th>
+                                        <th class="text-end">Сумма</th>
+                                        <th class="text-end">Оплачено</th>
+                                        <th class="text-end">Остаток</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="realizationsTableBody"></tbody>
+                            </table>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div class="text-muted small">
+                                    Выбрано к оплате: <span id="selectedTotal">0.00</span> руб.
+                                </div>
+                                <div class="text-muted small">
+                                    Остаток платежа: <span id="remainingAmount">0.00</span> руб.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модалки редактирования и удаления для каждого платежа -->
+{% for p in payments %}
+<!-- Модалка редактирования платежа {{ p.id }} -->
+<div class="modal fade" id="editPaymentModal{{ p.id }}" tabindex="-1" aria-labelledby="editPaymentLabel{{ p.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('update_payment', payment_id=p.id) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editPaymentLabel{{ p.id }}">Редактировать платеж</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Дата платежа <span class="text-danger">*</span></label>
+                        <input type="text" name="date" class="form-control js-date" value="{{ p.date.strftime('%d/%m/%Y') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Контрагент <span class="text-danger">*</span></label>
+                        <select name="counterparty_id" class="form-select" required>
+                            <option value="">Выберите контрагента</option>
+                            {% for cp in counterparties %}
+                                <option value="{{ cp.id }}" {% if cp.id == p.counterparty_id %}selected{% endif %}>{{ cp.brand_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Договор</label>
+                        <select name="contract_id" class="form-select">
+                            <option value="">Без договора</option>
+                            {% for contract in contracts %}
+                                <option value="{{ contract.id }}" {% if contract.id == p.contract_id %}selected{% endif %}>{{ contract.number }} ({{ contract.counterparty.brand_name }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Тип оплаты <span class="text-danger">*</span></label>
+                        <select name="payment_type" class="form-select" required>
+                            <option value="">Выберите тип оплаты</option>
+                            {% for pt in payment_types %}
+                                <option value="{{ pt.name }}" {% if pt.name == p.payment_type.name %}selected{% endif %}>{{ pt.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        <strong>Примечание:</strong> Сумма платежа ({{ "%.2f"|format(p.initial_amount) }} руб.) и распределение на реализации не редактируются, чтобы не нарушить учёт.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка удаления платежа {{ p.id }} -->
+<div class="modal fade" id="deletePaymentModal{{ p.id }}" tabindex="-1" aria-labelledby="deletePaymentLabel{{ p.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('delete_payment', payment_id=p.id) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deletePaymentLabel{{ p.id }}">Удалить платеж</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Удалить платеж от <strong>{{ p.date.strftime('%d/%m/%Y') }}</strong> от <strong>{{ p.counterparty.brand_name }}</strong>?</p>
+                    <p class="text-muted small">Сумма: {{ "%.2f"|format(p.initial_amount) }} руб. ({{ p.payment_type.value }})</p>
+                    {% set allocated_count = p.realizations.count() %}
+                    {% if allocated_count > 0 %}
+                        <div class="alert alert-warning small">
+                            <strong>Внимание:</strong> Платеж распределён на {{ allocated_count }} реализаций. При удалении все распределения будут откатаны, и статусы реализаций обновятся.
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const realizationsData = {{ realizations_json|tojson }};
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const counterpartySelect = document.getElementById('payment_counterparty');
+        const contractSelect = document.getElementById('payment_contract');
+        const paymentAmountInput = document.getElementById('payment_amount');
+        const realizationSection = document.getElementById('realizationSelection');
+        const realizationsTableBody = document.getElementById('realizationsTableBody');
+        const noRealizationsHint = document.getElementById('noRealizationsHint');
+        const selectedTotalElement = document.getElementById('selectedTotal');
+        const remainingAmountElement = document.getElementById('remainingAmount');
+        const createModal = document.getElementById('createPaymentModal');
+        
+        if (counterpartySelect && contractSelect) {
+            counterpartySelect.addEventListener('change', function() {
+                const selectedCounterpartyId = this.value;
+                const options = contractSelect.querySelectorAll('option');
+                
+                options.forEach(option => {
+                    if (option.value === '') {
+                        option.style.display = '';
+                    } else {
+                        const counterpartyId = option.getAttribute('data-counterparty');
+                        if (counterpartyId === selectedCounterpartyId) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
+                    }
+                });
+                
+                contractSelect.value = '';
+                renderRealizations(selectedCounterpartyId);
+            });
+        }
+
+        function formatCurrency(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function renderRealizations(counterpartyId) {
+            realizationsTableBody.innerHTML = '';
+            selectedTotalElement.textContent = '0.00';
+            remainingAmountElement.textContent = formatRemaining();
+
+            if (!counterpartyId || !realizationsData[counterpartyId] || realizationsData[counterpartyId].length === 0) {
+                realizationSection.style.display = 'none';
+                noRealizationsHint.style.display = counterpartyId ? '' : 'none';
+                return;
+            }
+
+            noRealizationsHint.style.display = 'none';
+            realizationSection.style.display = '';
+
+            realizationsData[counterpartyId].forEach(item => {
+                const debtFormatted = formatCurrency(item.debt);
+                const totalFormatted = formatCurrency(item.total);
+                const paidFormatted = formatCurrency(item.paid);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <input type="checkbox" class="form-check-input" name="realization_ids" value="${item.id}" data-debt="${debtFormatted}">
+                    </td>
+                    <td>${item.date}</td>
+                    <td>${item.number}</td>
+                    <td>
+                        ${item.contract_number ? `<span class="text-primary small">${item.contract_number}</span>` : '<span class="text-muted">Без договора</span>'}
+                        ${item.specification_number ? ` / <span class="text-muted small">${item.specification_number}</span>` : ''}
+                    </td>
+                    <td class="text-end">${totalFormatted}</td>
+                    <td class="text-end">${paidFormatted}</td>
+                    <td class="text-end fw-semibold">${debtFormatted}</td>
+                `;
+                realizationsTableBody.appendChild(row);
+            });
+
+            realizationsTableBody.querySelectorAll('input[name="realization_ids"]').forEach(cb => {
+                cb.addEventListener('change', updateSelectedTotal);
+            });
+        }
+
+        function formatRemaining() {
+            const amount = parseFloat((paymentAmountInput.value || '0').replace(',', '.')) || 0;
+            const selectedTotal = parseFloat(selectedTotalElement.textContent) || 0;
+            const remaining = amount - selectedTotal;
+            remainingAmountElement.classList.toggle('text-danger', remaining < 0);
+            return formatCurrency(remaining);
+        }
+
+        function updateSelectedTotal() {
+            const checkboxes = realizationsTableBody.querySelectorAll('input[name="realization_ids"]:checked');
+            let total = 0;
+            checkboxes.forEach(cb => {
+                total += parseFloat(cb.dataset.debt) || 0;
+            });
+            selectedTotalElement.textContent = total.toFixed(2);
+            remainingAmountElement.textContent = formatRemaining();
+        }
+
+        if (paymentAmountInput) {
+            paymentAmountInput.addEventListener('input', () => {
+                remainingAmountElement.textContent = formatRemaining();
+            });
+        }
+
+        if (createModal) {
+            createModal.addEventListener('show.bs.modal', () => {
+                realizationsTableBody.innerHTML = '';
+                realizationSection.style.display = 'none';
+                noRealizationsHint.style.display = 'none';
+                selectedTotalElement.textContent = '0.00';
+                remainingAmountElement.textContent = '0.00';
+                if (counterpartySelect) counterpartySelect.value = '';
+                if (contractSelect) contractSelect.value = '';
+                if (paymentAmountInput) paymentAmountInput.value = '';
+            });
+        }
+    });
+</script>
+{% endblock %}
+
