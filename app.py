@@ -2,8 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
-from datetime import datetime
-from sqlalchemy import extract
+from datetime import datetime, date, timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key' # Добавьте секретный ключ для сессий и флеш-сообщений
@@ -11,14 +10,14 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'app.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
 from models import (db, User, Counterparty, CounterpartyType, Role,
                     PropertyObject, PropertyObjectType, ServiceType, BusinessCategory,
                     PropertyObjectTypeEnum, ServiceTypeEnum, BusinessCategoryEnum,
                     Contract, ContractStatus, Specification, SpecificationService, BillingType,
-                    Realization, RealizationService, RealizationSource, PaymentType)
+                    Realization, RealizationService, RealizationSource, PaymentType, PaymentStatus)
+
+db.init_app(app)
+migrate = Migrate(app, db)
 
 def parse_date(value: str):
     value = (value or '').strip()
@@ -236,9 +235,25 @@ def contracts_list():
 @app.route('/contract/<int:contract_id>', methods=['GET', 'POST'])
 def contract_detail(contract_id):
     contract = Contract.query.get_or_404(contract_id)
+    
+    # Данные для всех форм, загружаются всегда
+    service_types = ServiceType.query.all()
+    property_objects = PropertyObject.query.all()
+    billing_types = list(BillingType)
+    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
+    managers = User.query.filter_by(role=Role.MANAGER).order_by(User.name).all()
+    categories = BusinessCategory.query.order_by(BusinessCategory.name).all()
+    statuses = list(ContractStatus)
+    spec_usage = {
+        spec.id: {
+            'services': len(spec.services),
+            'realizations': len(spec.realizations)
+        } for spec in contract.specifications
+    }
+    
+    form_with_error = None # Для хранения данных невалидной формы
 
     if request.method == 'POST':
-        # Определяем, какая форма была отправлена
         form_type = request.form.get('form_type')
 
         if form_type == 'update_contract':
@@ -252,6 +267,7 @@ def contract_detail(contract_id):
             contract.category_id = int(request.form['category_id'])
             db.session.commit()
             flash('Договор обновлён.', 'success')
+            return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'delete_contract':
             if contract.specifications or contract.realizations:
@@ -273,6 +289,7 @@ def contract_detail(contract_id):
             db.session.add(new_spec)
             db.session.commit()
             flash('Спецификация добавлена.', 'success')
+            return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'update_specification':
             spec = Specification.query.get_or_404(int(request.form['specification_id']))
@@ -282,6 +299,7 @@ def contract_detail(contract_id):
             spec.description = request.form.get('description')
             db.session.commit()
             flash('Спецификация обновлена.', 'success')
+            return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'delete_specification':
             spec = Specification.query.get_or_404(int(request.form['specification_id']))
@@ -291,58 +309,72 @@ def contract_detail(contract_id):
                 db.session.delete(spec)
                 db.session.commit()
                 flash('Спецификация удалена.', 'success')
+            return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'add_service':
             spec_id = int(request.form.get('specification_id'))
-            new_service = SpecificationService(
-                specification_id=spec_id,
-                service_type_id=int(request.form['service_type_id']),
-                property_object_id=int(request.form['property_object_id']) if request.form.get('property_object_id') else None,
-                description=request.form.get('description'),
-                billing_type=BillingType[request.form['billing_type']],
-                start_date=parse_date(request.form['start_date']),
-                end_date=parse_date(request.form.get('end_date')),
-                amount=request.form['amount']
-            )
-            db.session.add(new_service)
-            db.session.commit()
-            flash('Услуга добавлена.', 'success')
+            spec = Specification.query.get_or_404(spec_id)
+            service_start = parse_date(request.form['start_date'])
+            service_end = parse_date(request.form.get('end_date'))
+            
+            error = None
+            if service_start < spec.start_date or service_start > spec.end_date:
+                error = f'Дата начала услуги должна быть в пределах спецификации ({spec.start_date.strftime("%d/%m/%Y")} - {spec.end_date.strftime("%d/%m/%Y")}).'
+            if service_end and (service_end < spec.start_date or service_end > spec.end_date):
+                error = f'Дата окончания услуги должна быть в пределах спецификации ({spec.start_date.strftime("%d/%m/%Y")} - {spec.end_date.strftime("%d/%m/%Y")}).'
+
+            if error:
+                flash(error, 'danger')
+                form_with_error = { 'type': 'add_service', 'spec_id': spec_id, 'data': request.form }
+            else:
+                new_service = SpecificationService(
+                    specification_id=spec_id,
+                    service_type_id=int(request.form['service_type_id']),
+                    property_object_id=int(request.form['property_object_id']) if request.form.get('property_object_id') else None,
+                    description=request.form.get('description'),
+                    billing_type=BillingType[request.form['billing_type']],
+                    start_date=service_start,
+                    end_date=service_end,
+                    amount=request.form['amount']
+                )
+                db.session.add(new_service)
+                db.session.commit()
+                flash('Услуга добавлена.', 'success')
+                return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'update_service':
             service = SpecificationService.query.get_or_404(int(request.form['service_id']))
-            service.service_type_id = int(request.form['service_type_id'])
-            service.property_object_id = int(request.form['property_object_id']) if request.form.get('property_object_id') else None
-            service.description = request.form.get('description')
-            service.billing_type = BillingType[request.form['billing_type']]
-            service.start_date = parse_date(request.form['start_date'])
-            service.end_date = parse_date(request.form.get('end_date'))
-            service.amount = request.form['amount']
-            db.session.commit()
-            flash('Услуга обновлена.', 'success')
+            spec = service.specification
+            service_start = parse_date(request.form['start_date'])
+            service_end = parse_date(request.form.get('end_date'))
+            
+            error = None
+            if service_start < spec.start_date or service_start > spec.end_date:
+                error = f'Дата начала услуги должна быть в пределах спецификации ({spec.start_date.strftime("%d/%m/%Y")} - {spec.end_date.strftime("%d/%m/%Y")}).'
+            if service_end and (service_end < spec.start_date or service_end > spec.end_date):
+                error = f'Дата окончания услуги должна быть в пределах спецификации ({spec.start_date.strftime("%d/%m/%Y")} - {spec.end_date.strftime("%d/%m/%Y")}).'
+
+            if error:
+                flash(error, 'danger')
+                form_with_error = { 'type': 'update_service', 'service_id': service.id, 'data': request.form }
+            else:
+                service.service_type_id = int(request.form['service_type_id'])
+                service.property_object_id = int(request.form['property_object_id']) if request.form.get('property_object_id') else None
+                service.description = request.form.get('description')
+                service.billing_type = BillingType[request.form['billing_type']]
+                service.start_date = service_start
+                service.end_date = service_end
+                service.amount = request.form['amount']
+                db.session.commit()
+                flash('Услуга обновлена.', 'success')
+                return redirect(url_for('contract_detail', contract_id=contract.id))
 
         elif form_type == 'delete_service':
             service = SpecificationService.query.get_or_404(int(request.form['service_id']))
             db.session.delete(service)
             db.session.commit()
             flash('Услуга удалена.', 'success')
-
-        return redirect(url_for('contract_detail', contract_id=contract.id))
-
-    # Данные для форм
-    service_types = ServiceType.query.all()
-    property_objects = PropertyObject.query.all()
-    billing_types = list(BillingType)
-    counterparties = Counterparty.query.order_by(Counterparty.brand_name).all()
-    managers = User.query.filter_by(role=Role.MANAGER).order_by(User.name).all()
-    categories = BusinessCategory.query.order_by(BusinessCategory.name).all()
-    statuses = list(ContractStatus)
-    spec_usage = {
-        spec.id: {
-            'services': len(spec.services),
-            'realizations': len(spec.realizations)
-        }
-        for spec in contract.specifications
-    }
+            return redirect(url_for('contract_detail', contract_id=contract.id))
 
     return render_template('contract_detail.html', 
                            contract=contract,
@@ -353,15 +385,39 @@ def contract_detail(contract_id):
                            managers=managers,
                            categories=categories,
                            statuses=statuses,
-                           spec_usage=spec_usage)
+                           spec_usage=spec_usage,
+                           form_with_error=form_with_error)
 
 @app.route('/realizations', methods=['GET', 'POST'])
 def realizations_list():
     if request.method == 'POST':
-        # Логика для создания разовой реализации (пока заглушка)
-        pass
+        form_type = request.form.get('form_type')
+        
+        if form_type == 'update_realization':
+            realization = Realization.query.get_or_404(int(request.form['realization_id']))
+            realization.date = parse_date(request.form['date'])
+            realization.payment_type = PaymentType[request.form['payment_type']]
+            realization.payment_status = PaymentStatus[request.form['payment_status']]
+            db.session.commit()
+            flash('Реализация обновлена.', 'success')
+            
+        elif form_type == 'delete_realization':
+            realization = Realization.query.get_or_404(int(request.form['realization_id']))
+            # Проверка зависимостей: услуги реализации будут удалены каскадом
+            db.session.delete(realization)
+            db.session.commit()
+            flash('Реализация удалена.', 'success')
+            
+        return redirect(url_for('realizations_list'))
+    
     realizations = Realization.query.order_by(Realization.date.desc()).all()
-    return render_template('realizations.html', realizations=realizations, now=datetime.now())
+    payment_types = list(PaymentType)
+    payment_statuses = list(PaymentStatus)
+    return render_template('realizations.html', 
+                          realizations=realizations, 
+                          payment_types=payment_types,
+                          payment_statuses=payment_statuses,
+                          now=datetime.now())
 
 @app.route('/generate-realizations', methods=['POST'])
 def generate_realizations():
@@ -371,6 +427,9 @@ def generate_realizations():
         return redirect(url_for('realizations_list'))
 
     year, month = map(int, month_year_str.split('-'))
+    month_start = date(year, month, 1)
+    next_month = date(year + (month // 12), (month % 12) + 1, 1)
+    month_end = next_month - timedelta(days=1)
     
     # 1. Найти все активные договоры
     active_contracts = Contract.query.filter_by(status=ContractStatus.ACTIVE).all()
@@ -381,10 +440,8 @@ def generate_realizations():
         # 2. Найти все подходящие спецификации
         specs = Specification.query.filter(
             Specification.contract_id == contract.id,
-            extract('year', Specification.start_date) <= year,
-            extract('month', Specification.start_date) <= month,
-            extract('year', Specification.end_date) >= year,
-            extract('month', Specification.end_date) >= month
+            Specification.start_date <= month_end,
+            Specification.end_date >= month_start
         ).all()
 
         for spec in specs:
@@ -406,7 +463,7 @@ def generate_realizations():
                 if not exists:
                     # 5. Создать реализацию
                     new_realization = Realization(
-                        date=datetime(year, month, 1),
+                        date=month_start,
                         source=RealizationSource.AUTO,
                         month=month,
                         year=year,

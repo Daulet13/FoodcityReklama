@@ -41,12 +41,13 @@
                     <th>Расходы</th>
                     <th>Прибыль</th>
                     <th>Статус оплаты</th>
+                    <th>Действия</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in realizations %}
                 <tr>
-                    <td>{{ r.number }}</td>
+                    <td><a href="#" class="text-decoration-none">{{ r.number }}</a></td>
                     <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                     <td>{{ r.counterparty.brand_name }}</td>
                     <td>{{ r.source.value }}</td>
@@ -54,14 +55,101 @@
                     <td class="text-end">{{ "%.2f"|format(r.total_expense) }}</td>
                     <td class="text-end fw-bold">{{ "%.2f"|format(r.total_profit) }}</td>
                     <td><span class="badge bg-warning text-dark">{{ r.payment_status.value }}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editRealizationModal{{ r.id }}">Изменить</button>
+                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteRealizationModal{{ r.id }}">Удалить</button>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center">Реализаций пока нет.</td>
+                    <td colspan="9" class="text-center">Реализаций пока нет.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- Модальные окна редактирования -->
+{% for r in realizations %}
+<div class="modal fade" id="editRealizationModal{{ r.id }}" tabindex="-1" aria-labelledby="editRealizationModalLabel{{ r.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editRealizationModalLabel{{ r.id }}">Редактировать реализацию {{ r.number }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="form_type" value="update_realization">
+                    <input type="hidden" name="realization_id" value="{{ r.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Номер</label>
+                        <input type="text" class="form-control" value="{{ r.number }}" disabled>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Дата <span class="text-danger">*</span></label>
+                        <input type="date" name="date" class="form-control" value="{{ r.date.strftime('%d/%m/%Y') }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Тип оплаты <span class="text-danger">*</span></label>
+                        <select name="payment_type" class="form-select" required>
+                            {% for pt in payment_types %}
+                            <option value="{{ pt.name }}" {% if pt == r.payment_type %}selected{% endif %}>{{ pt.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Статус оплаты <span class="text-danger">*</span></label>
+                        <select name="payment_status" class="form-select" required>
+                            {% for ps in payment_statuses %}
+                            <option value="{{ ps.name }}" {% if ps == r.payment_status %}selected{% endif %}>{{ ps.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info" role="alert">
+                        <strong>Контрагент:</strong> {{ r.counterparty.brand_name }}<br>
+                        <strong>Источник:</strong> {{ r.source.value }}<br>
+                        <strong>Сумма продажи:</strong> {{ "%.2f"|format(r.total_sale) }}<br>
+                        <strong>Расходы:</strong> {{ "%.2f"|format(r.total_expense) }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно удаления -->
+<div class="modal fade" id="deleteRealizationModal{{ r.id }}" tabindex="-1" aria-labelledby="deleteRealizationModalLabel{{ r.id }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteRealizationModalLabel{{ r.id }}">Удалить реализацию?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="form_type" value="delete_realization">
+                    <input type="hidden" name="realization_id" value="{{ r.id }}">
+                    <p>Вы уверены, что хотите удалить реализацию <strong>{{ r.number }}</strong>?</p>
+                    <p class="text-muted">Будут удалены все связанные услуги реализации.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

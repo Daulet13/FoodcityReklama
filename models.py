@@ -1,6 +1,8 @@
-from app import db
+from flask_sqlalchemy import SQLAlchemy
 import enum
 from datetime import datetime
+
+db = SQLAlchemy()
 
 
 class Role(enum.Enum):
