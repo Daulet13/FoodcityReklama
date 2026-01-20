@@ -280,7 +280,8 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    const realizationsData = {{ realizations_json|tojson }};
+    const realizationsData = {{ realizations_json|tojson|safe }};
+    console.log('Realizations data loaded:', realizationsData);
 
     document.addEventListener('DOMContentLoaded', function() {
         const counterpartySelect = document.getElementById('payment_counterparty');
@@ -293,9 +294,16 @@
         const remainingAmountElement = document.getElementById('remainingAmount');
         const createModal = document.getElementById('createPaymentModal');
         
+        console.log('Elements found:', {
+            counterpartySelect: !!counterpartySelect,
+            realizationSection: !!realizationSection,
+            realizationsTableBody: !!realizationsTableBody
+        });
+        
         if (counterpartySelect && contractSelect) {
             counterpartySelect.addEventListener('change', function() {
                 const selectedCounterpartyId = this.value;
+                console.log('Selected counterparty ID:', selectedCounterpartyId);
                 const options = contractSelect.querySelectorAll('option');
                 
                 options.forEach(option => {
@@ -321,16 +329,26 @@
         }
 
         function renderRealizations(counterpartyId) {
+            console.log('renderRealizations called with ID:', counterpartyId);
+            console.log('Realizations for this counterparty:', realizationsData[counterpartyId]);
+            
+            if (!realizationsTableBody) {
+                console.error('realizationsTableBody not found!');
+                return;
+            }
+            
             realizationsTableBody.innerHTML = '';
             selectedTotalElement.textContent = '0.00';
             remainingAmountElement.textContent = formatRemaining();
 
             if (!counterpartyId || !realizationsData[counterpartyId] || realizationsData[counterpartyId].length === 0) {
+                console.log('No realizations found or empty counterpartyId');
                 realizationSection.style.display = 'none';
                 noRealizationsHint.style.display = counterpartyId ? '' : 'none';
                 return;
             }
 
+            console.log('Showing realizations section');
             noRealizationsHint.style.display = 'none';
             realizationSection.style.display = '';
 

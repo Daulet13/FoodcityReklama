@@ -861,7 +861,7 @@ def payments_list():
 
     realizations_payload = {}
     for counterparty_id, items in realizations_by_counterparty.items():
-        realizations_payload[counterparty_id] = [
+        realizations_payload[str(counterparty_id)] = [
             {
                 'id': item.id,
                 'number': item.number,

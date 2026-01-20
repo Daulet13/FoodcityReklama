@@ -17,8 +17,12 @@ depends_on = None
 
 
 def upgrade():
-    pass
+    # SQLite не поддерживает ALTER TABLE DROP COLUMN напрямую
+    # Но так как это development окружение, можно воссоздать таблицу
+    with op.batch_alter_table('realization', schema=None) as batch_op:
+        batch_op.drop_column('payment_type')
 
 
 def downgrade():
-    pass
+    with op.batch_alter_table('realization', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('payment_type', sa.VARCHAR(length=20), nullable=True))
